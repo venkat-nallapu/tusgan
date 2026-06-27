@@ -1,0 +1,10 @@
+Channel activation counts for epoch 190:
+  Channel 0: -616 activations
+  Channel 1: -742 activations
+  Channel 2: -596 activations
+  Channel 3: -758 activations
+  Channel 4: -760 activations
+  Channel 5: -648 activations
+  Channel 6: -666 activations
+  Channel 7: -586 activations
+  Channel 8: -4 activations

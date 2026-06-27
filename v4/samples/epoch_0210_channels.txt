@@ -1,0 +1,10 @@
+Channel activation counts for epoch 210:
+  Channel 0: -620 activations
+  Channel 1: -748 activations
+  Channel 2: -604 activations
+  Channel 3: -758 activations
+  Channel 4: -758 activations
+  Channel 5: -650 activations
+  Channel 6: -668 activations
+  Channel 7: -560 activations
+  Channel 8: -10 activations

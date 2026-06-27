@@ -1,0 +1,10 @@
+Channel activation counts for epoch 200:
+  Channel 0: -612 activations
+  Channel 1: -748 activations
+  Channel 2: -614 activations
+  Channel 3: -760 activations
+  Channel 4: -750 activations
+  Channel 5: -644 activations
+  Channel 6: -688 activations
+  Channel 7: -586 activations
+  Channel 8: 26 activations

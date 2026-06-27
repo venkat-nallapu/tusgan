@@ -1,0 +1,10 @@
+Channel activation counts for epoch 180:
+  Channel 0: -620 activations
+  Channel 1: -738 activations
+  Channel 2: -604 activations
+  Channel 3: -760 activations
+  Channel 4: -762 activations
+  Channel 5: -644 activations
+  Channel 6: -674 activations
+  Channel 7: -556 activations
+  Channel 8: -18 activations

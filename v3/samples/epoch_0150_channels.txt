@@ -1,0 +1,10 @@
+Channel activation counts for epoch 150:
+  Channel 0: -558 activations
+  Channel 1: -768 activations
+  Channel 2: -658 activations
+  Channel 3: -722 activations
+  Channel 4: -768 activations
+  Channel 5: -606 activations
+  Channel 6: -702 activations
+  Channel 7: -626 activations
+  Channel 8: 32 activations

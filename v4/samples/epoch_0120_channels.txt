@@ -1,0 +1,10 @@
+Channel activation counts for epoch 120:
+  Channel 0: -614 activations
+  Channel 1: -720 activations
+  Channel 2: -606 activations
+  Channel 3: -756 activations
+  Channel 4: -742 activations
+  Channel 5: -636 activations
+  Channel 6: -702 activations
+  Channel 7: -560 activations
+  Channel 8: -40 activations

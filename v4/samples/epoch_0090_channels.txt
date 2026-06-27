@@ -1,0 +1,10 @@
+Channel activation counts for epoch 90:
+  Channel 0: -606 activations
+  Channel 1: -696 activations
+  Channel 2: -598 activations
+  Channel 3: -762 activations
+  Channel 4: -740 activations
+  Channel 5: -654 activations
+  Channel 6: -688 activations
+  Channel 7: -580 activations
+  Channel 8: -52 activations

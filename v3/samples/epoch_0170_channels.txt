@@ -1,0 +1,10 @@
+Channel activation counts for epoch 170:
+  Channel 0: -566 activations
+  Channel 1: -766 activations
+  Channel 2: -648 activations
+  Channel 3: -718 activations
+  Channel 4: -768 activations
+  Channel 5: -606 activations
+  Channel 6: -698 activations
+  Channel 7: -632 activations
+  Channel 8: 26 activations

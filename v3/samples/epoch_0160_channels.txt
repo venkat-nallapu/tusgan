@@ -1,0 +1,10 @@
+Channel activation counts for epoch 160:
+  Channel 0: -562 activations
+  Channel 1: -766 activations
+  Channel 2: -636 activations
+  Channel 3: -722 activations
+  Channel 4: -766 activations
+  Channel 5: -604 activations
+  Channel 6: -698 activations
+  Channel 7: -642 activations
+  Channel 8: 20 activations

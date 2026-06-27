@@ -1,0 +1,10 @@
+Channel activation counts for epoch 220:
+  Channel 0: -586 activations
+  Channel 1: -762 activations
+  Channel 2: -656 activations
+  Channel 3: -730 activations
+  Channel 4: -768 activations
+  Channel 5: -608 activations
+  Channel 6: -674 activations
+  Channel 7: -590 activations
+  Channel 8: -2 activations

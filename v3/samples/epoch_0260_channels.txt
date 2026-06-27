@@ -1,0 +1,10 @@
+Channel activation counts for epoch 260:
+  Channel 0: -602 activations
+  Channel 1: -760 activations
+  Channel 2: -650 activations
+  Channel 3: -728 activations
+  Channel 4: -768 activations
+  Channel 5: -610 activations
+  Channel 6: -680 activations
+  Channel 7: -616 activations
+  Channel 8: 38 activations

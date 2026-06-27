@@ -1,0 +1,10 @@
+Channel activation counts for epoch 320:
+  Channel 0: -604 activations
+  Channel 1: -756 activations
+  Channel 2: -644 activations
+  Channel 3: -732 activations
+  Channel 4: -768 activations
+  Channel 5: -598 activations
+  Channel 6: -682 activations
+  Channel 7: -606 activations
+  Channel 8: 14 activations

@@ -1,0 +1,10 @@
+Channel activation counts for epoch 30:
+  Channel 0: -610 activations
+  Channel 1: -720 activations
+  Channel 2: -596 activations
+  Channel 3: -766 activations
+  Channel 4: -764 activations
+  Channel 5: -690 activations
+  Channel 6: -648 activations
+  Channel 7: -550 activations
+  Channel 8: -32 activations

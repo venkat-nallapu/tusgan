@@ -1,0 +1,10 @@
+Channel activation counts for epoch 10:
+  Channel 0: -660 activations
+  Channel 1: -728 activations
+  Channel 2: -688 activations
+  Channel 3: -702 activations
+  Channel 4: -716 activations
+  Channel 5: -714 activations
+  Channel 6: -550 activations
+  Channel 7: -580 activations
+  Channel 8: -38 activations

@@ -1,0 +1,10 @@
+Channel activation counts for epoch 280:
+  Channel 0: -592 activations
+  Channel 1: -756 activations
+  Channel 2: -656 activations
+  Channel 3: -726 activations
+  Channel 4: -768 activations
+  Channel 5: -610 activations
+  Channel 6: -682 activations
+  Channel 7: -610 activations
+  Channel 8: 24 activations

@@ -1,0 +1,10 @@
+Channel activation counts for epoch 130:
+  Channel 0: -594 activations
+  Channel 1: -734 activations
+  Channel 2: -634 activations
+  Channel 3: -752 activations
+  Channel 4: -750 activations
+  Channel 5: -642 activations
+  Channel 6: -674 activations
+  Channel 7: -572 activations
+  Channel 8: -24 activations

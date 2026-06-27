@@ -1,0 +1,10 @@
+Channel activation counts for epoch 80:
+  Channel 0: -574 activations
+  Channel 1: -754 activations
+  Channel 2: -614 activations
+  Channel 3: -756 activations
+  Channel 4: -744 activations
+  Channel 5: -668 activations
+  Channel 6: -678 activations
+  Channel 7: -594 activations
+  Channel 8: 6 activations

@@ -1,0 +1,10 @@
+Channel activation counts for epoch 70:
+  Channel 0: -554 activations
+  Channel 1: -738 activations
+  Channel 2: -576 activations
+  Channel 3: -756 activations
+  Channel 4: -746 activations
+  Channel 5: -670 activations
+  Channel 6: -672 activations
+  Channel 7: -588 activations
+  Channel 8: -76 activations

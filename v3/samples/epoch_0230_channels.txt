@@ -1,0 +1,10 @@
+Channel activation counts for epoch 230:
+  Channel 0: -580 activations
+  Channel 1: -762 activations
+  Channel 2: -632 activations
+  Channel 3: -734 activations
+  Channel 4: -768 activations
+  Channel 5: -600 activations
+  Channel 6: -698 activations
+  Channel 7: -604 activations
+  Channel 8: 2 activations

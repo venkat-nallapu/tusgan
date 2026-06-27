@@ -1,0 +1,10 @@
+Channel activation counts for epoch 140:
+  Channel 0: -604 activations
+  Channel 1: -746 activations
+  Channel 2: -610 activations
+  Channel 3: -754 activations
+  Channel 4: -752 activations
+  Channel 5: -636 activations
+  Channel 6: -670 activations
+  Channel 7: -570 activations
+  Channel 8: -34 activations

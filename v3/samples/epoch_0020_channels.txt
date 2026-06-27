@@ -1,0 +1,10 @@
+Channel activation counts for epoch 20:
+  Channel 0: -594 activations
+  Channel 1: -768 activations
+  Channel 2: -706 activations
+  Channel 3: -724 activations
+  Channel 4: -762 activations
+  Channel 5: -672 activations
+  Channel 6: -624 activations
+  Channel 7: -578 activations
+  Channel 8: 52 activations

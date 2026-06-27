@@ -1,0 +1,10 @@
+Channel activation counts for epoch 60:
+  Channel 0: -492 activations
+  Channel 1: -766 activations
+  Channel 2: -668 activations
+  Channel 3: -748 activations
+  Channel 4: -768 activations
+  Channel 5: -568 activations
+  Channel 6: -700 activations
+  Channel 7: -620 activations
+  Channel 8: -46 activations

@@ -1,0 +1,10 @@
+Channel activation counts for epoch 350:
+  Channel 0: -608 activations
+  Channel 1: -758 activations
+  Channel 2: -654 activations
+  Channel 3: -722 activations
+  Channel 4: -768 activations
+  Channel 5: -604 activations
+  Channel 6: -674 activations
+  Channel 7: -618 activations
+  Channel 8: 30 activations

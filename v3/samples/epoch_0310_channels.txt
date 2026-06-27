@@ -1,0 +1,10 @@
+Channel activation counts for epoch 310:
+  Channel 0: -592 activations
+  Channel 1: -756 activations
+  Channel 2: -658 activations
+  Channel 3: -722 activations
+  Channel 4: -768 activations
+  Channel 5: -608 activations
+  Channel 6: -664 activations
+  Channel 7: -622 activations
+  Channel 8: 14 activations

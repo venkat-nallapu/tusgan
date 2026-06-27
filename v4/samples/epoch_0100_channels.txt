@@ -1,0 +1,10 @@
+Channel activation counts for epoch 100:
+  Channel 0: -602 activations
+  Channel 1: -722 activations
+  Channel 2: -638 activations
+  Channel 3: -762 activations
+  Channel 4: -732 activations
+  Channel 5: -654 activations
+  Channel 6: -694 activations
+  Channel 7: -564 activations
+  Channel 8: -8 activations

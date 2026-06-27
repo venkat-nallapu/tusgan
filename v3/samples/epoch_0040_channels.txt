@@ -1,0 +1,10 @@
+Channel activation counts for epoch 40:
+  Channel 0: -520 activations
+  Channel 1: -768 activations
+  Channel 2: -688 activations
+  Channel 3: -756 activations
+  Channel 4: -768 activations
+  Channel 5: -548 activations
+  Channel 6: -706 activations
+  Channel 7: -652 activations
+  Channel 8: 30 activations

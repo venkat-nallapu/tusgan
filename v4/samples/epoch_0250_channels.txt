@@ -1,0 +1,10 @@
+Channel activation counts for epoch 250:
+  Channel 0: -628 activations
+  Channel 1: -754 activations
+  Channel 2: -616 activations
+  Channel 3: -762 activations
+  Channel 4: -764 activations
+  Channel 5: -652 activations
+  Channel 6: -664 activations
+  Channel 7: -584 activations
+  Channel 8: 48 activations

@@ -1,0 +1,10 @@
+Channel activation counts for epoch 240:
+  Channel 0: -586 activations
+  Channel 1: -762 activations
+  Channel 2: -648 activations
+  Channel 3: -730 activations
+  Channel 4: -768 activations
+  Channel 5: -602 activations
+  Channel 6: -696 activations
+  Channel 7: -626 activations
+  Channel 8: 42 activations
