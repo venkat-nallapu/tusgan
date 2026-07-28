@@ -303,3 +303,28 @@ Fix PyTorch gradient calculation crashes related to second-order derivatives in 
 #### 📁 Files Touched
 - `[v5/train.py](file:///home/venkat/projects/tusgan-v3/v5/train.py)`: Implemented SDP backend fallback and `nn.DataParallel` integration.
 - `[v5/smoke_test.py](file:///home/venkat/projects/tusgan-v3/v5/smoke_test.py)`: Mirrored SDP backend fix for safe local validation.
+
+---
+
+### 🗓️ 2026-06-28 15:00 - v5 Final Evaluation & TUS-GAN v6 Architecture Setup
+
+> [!NOTE]
+> **Category**: `Architecture 🏗️` / `Evaluation 📊`  
+> **Author**: Developer / AI Assistant (Antigravity)
+
+#### 🎯 Intent & Impact
+Evaluate the final v5 model trained on A100 GPUs and address the statistical degradation (JSD and F-Norm worsened compared to v4) by initializing the v6 architecture. v6 merges the absolute logic enforcement of v5 with deep Transformer capacities, rotary positional encodings, and gradient-enabling soft penalties.
+
+#### 🛠️ Code Modification Details
+- **Evaluated v5**: Ran `v5/evaluate_ultimate.py` with 100k samples, noting a perfect 0.00% child labor rate but worsened JSD (`0.001557`).
+- **Deep Conformer Architecture**: Initialized `v6/generator.py` by scaling `TemporalTransformerBlock` depth to 6 layers and 8 attention heads.
+- **RoPE / Positional Embeddings**: Replaced absolute learned positional embeddings with Sinusoidal `PositionalEncoding` in `v6/generator.py`.
+- **Hybrid Soft/Hard Constraints**: In `v6/train.py`, re-introduced the `compute_neuro_symbolic_loss` soft penalty to restore backpropagation gradients for forbidden states, solving the "dead gradient" issue caused by v5's `-1e9` logit masking.
+- **Loss Rebalancing**: Reduced `lambda_infonce` from `0.5` to `0.1` to prevent contrastive loss from overpowering adversarial JSD training.
+- **Documentation**: Created `[tusgan-v6.md](file:///home/venkat/projects/tusgan-v3/tusgan-v6.md)` outlining the hybrid architecture and updated `[tusgan-v5.md](file:///home/venkat/projects/tusgan-v3/tusgan-v5.md)` with 100k sample results.
+
+#### 📁 Files Touched
+- `[tusgan-v5.md](file:///home/venkat/projects/tusgan-v3/tusgan-v5.md)`
+- `[tusgan-v6.md](file:///home/venkat/projects/tusgan-v3/tusgan-v6.md)`
+- `[v6/generator.py](file:///home/venkat/projects/tusgan-v3/v6/generator.py)`
+- `[v6/train.py](file:///home/venkat/projects/tusgan-v3/v6/train.py)`

@@ -1,4 +1,22 @@
-/.venv-v3
-/.vscode
-/__pycache__
-/v5.zip
+# Environments
+.venv*
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Data and Checkpoints
+*.pth
+*.zip
+
+# Logs and outputs
+runs/
+samples/
+.ipynb_checkpoints/

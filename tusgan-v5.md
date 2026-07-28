@@ -62,3 +62,9 @@ graph TD
   - A comprehensive all-in-one script calculating JSD, Transition Matrix F-Norm, Spell-Duration EMD, Adversarial ROC-AUC, and generating 5 distinct visual dashboards.
 - **Advanced Smoke Testing:** `python v5/smoke_test.py`
   - Runs deep structural validation to guarantee gradient flow through the Transformer blocks and confirms the structural integrity of the Deterministic Logit Masking.
+
+## 🏆 Final Training Results (100k Samples)
+- **Jensen-Shannon Divergence (JSD):** `0.001557` (Worse than v4 due to Transformer instability and "dead gradients" from hard masking).
+- **Transition Matrix Difference (F-norm):** `0.273604` (Worse than v4, limited by shallow Transformer capacity and absolute positional embeddings).
+- **Logical Violation Rate:** `0.00%` (Perfect compliance achieved via Deterministic Logit Masking, a major improvement over v4's 0.30%).
+- **Adversarial Validation AUC-ROC:** `0.7421` (Accuracy: 67.42%. Slightly more distinguishable than v4).

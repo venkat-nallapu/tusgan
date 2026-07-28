@@ -308,7 +308,7 @@ def train(cfg):
     real_avg_durations = get_real_avg_durations(dataset, device)
     print(f"Real Target Durations (30-min slots): {real_avg_durations.cpu().numpy()}")
 
-    num_workers = min(4, os.cpu_count() or 2)
+    num_workers = min(16, os.cpu_count() or 4)
     loader = DataLoader(
         dataset,
         batch_size=cfg["batch_size"],
@@ -316,6 +316,8 @@ def train(cfg):
         num_workers=num_workers,
         pin_memory=(device.type == "cuda"),
         drop_last=True,
+        persistent_workers=(num_workers > 0),
+        prefetch_factor=4 if num_workers > 0 else None,
     )
     data_iter = iter(loader)
 
@@ -353,6 +355,11 @@ def train(cfg):
     sched_D = torch.optim.lr_scheduler.CosineAnnealingLR(opt_D, T_max=cfg["epochs"], eta_min=1e-6)
 
     ema = EMA(G, decay=cfg["ema_decay"])
+
+    if hasattr(torch, "compile"):
+        print("⚡ Compiling models with torch.compile for A100 optimization...")
+        G = torch.compile(G)
+        D = torch.compile(D)
 
     # Wrap in DataParallel if multiple GPUs are available
     if torch.cuda.device_count() > 1:
@@ -437,7 +444,7 @@ def train(cfg):
                     critic_loss(real_scores, fake_scores, gp) + cfg["lambda_infonce"] * loss_infonce
                 )
 
-                opt_D.zero_grad()
+                opt_D.zero_grad(set_to_none=True)
                 loss_D.backward()
                 opt_D.step()
 
@@ -484,7 +491,7 @@ def train(cfg):
                 + cfg["lambda_duration"] * loss_duration
             )
 
-            opt_G.zero_grad()
+            opt_G.zero_grad(set_to_none=True)
             loss_G.backward()
             opt_G.step()
 
@@ -585,6 +592,7 @@ def parse_args():
 if __name__ == "__main__":
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True  # A100 Optimization
 
     # Disable optimized SDP attention backends because they do not support
     # double backward passes required for WGAN-GP's gradient penalty.

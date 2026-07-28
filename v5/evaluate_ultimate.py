@@ -328,6 +328,30 @@ def plot_all_visuals(
     plt.savefig(os.path.join(output_dir, "adversarial_roc.png"), dpi=150)
     plt.close()
 
+    # 6. Sample Diary Sequences (Step-plot)
+    fig, axes = plt.subplots(2, 5, figsize=(22, 8), sharex=True, sharey=True)
+
+    for i in range(5):
+        if i < real_codes.shape[0]:
+            axes[0, i].step(range(48), real_codes[i], where="post", color="#4C72B0", linewidth=1.2)
+            axes[0, i].set_title(f"Real Diary {i + 1}", fontsize=9)
+
+        if i < fake_codes.shape[0]:
+            axes[1, i].step(range(48), fake_codes[i], where="post", color="#DD8452", linewidth=1.2)
+            axes[1, i].set_title(f"Synthetic Diary {i + 1}", fontsize=9)
+
+    for ax in axes.flatten():
+        ax.set_ylim(0.5, 9.5)
+        ax.set_yticks(range(1, 10))
+        ax.set_yticklabels([DIVISION_LABELS[d][:10] for d in range(1, 10)], fontsize=6)
+        ax.grid(axis="y", linestyle=":", alpha=0.3)
+
+    fig.supxlabel("Time Slot (30 mins)")
+    fig.supylabel("Activity Division")
+    fig.tight_layout()
+    plt.savefig(os.path.join(output_dir, "sample_diaries.png"), dpi=150)
+    plt.close(fig)
+
 
 # ─────────────────────────────────────────────────────────────
 # 9. MAIN RUNNER

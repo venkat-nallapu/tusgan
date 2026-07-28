@@ -8,11 +8,13 @@ This repository contains the development, training, and evaluation pipelines for
 
 The workspace is organized into separate directories for each development version to isolate weights, datasets, training logs, and analysis:
 
-*   **[v3/](file:///home/venkat/projects/tusgan-v3/v3/)**: Baseline model introducing categorical Gumbel-Softmax discretization and Global Transition Matrix Loss. Achieved high population-level distribution alignment but had small logical leaks.
-*   **[v4/](file:///home/venkat/projects/tusgan-v3/v4/)**: Upgraded model incorporating decoupled Demographic AC-GAN Loss, Time-Slice Transition Loss (for time-of-day dynamics), and Neuro-Symbolic Logic Constraints (preventing Child Labor violations).
-    *   *See [v4/README.md](file:///home/venkat/projects/tusgan-v3/v4/README.md) for a detailed v3 vs v4 performance comparison and mathematical formulations.*
-*   **`[dashboard.py](file:///home/venkat/projects/tusgan-v3/dashboard.py)`**: Interactive Streamlit application to generate individual daily diaries in real-time. Supports switching between v3 and v4 models.
-*   **`[DEVELOPMENT_LEDGER.md](file:///home/venkat/projects/tusgan-v3/DEVELOPMENT_LEDGER.md)`**: Change ledger recording all architectural modifications, training runs, and benchmark metrics chronological-order.
+*   **[v3/](v3/)**: Baseline model introducing categorical Gumbel-Softmax discretization and Global Transition Matrix Loss. Achieved high population-level distribution alignment but had small logical leaks.
+*   **[v4/](v4/)**: Upgraded model incorporating decoupled Demographic AC-GAN Loss, Time-Slice Transition Loss (for time-of-day dynamics), and Neuro-Symbolic Logic Constraints (preventing Child Labor violations).
+    *   *See [v4/README.md](v4/README.md) for a detailed v3 vs v4 performance comparison and mathematical formulations.*
+*   **[v5/](v5/)**: Transformer integration replacing CNNs, featuring Differentiable Spell-Duration targets and Deterministic Logit Masking for perfect logical compliance.
+*   **[v6/](v6/)**: Deep Conformer-style architecture using Rotary Positional Embeddings and Hybrid Soft/Hard Constraints to restore statistical realism.
+*   **[`dashboard.py`](dashboard.py)**: Interactive Streamlit application to generate individual daily diaries in real-time. Supports switching between v3, v4, v5, and v6 models.
+*   **[`DEVELOPMENT_LEDGER.md`](DEVELOPMENT_LEDGER.md)**: Change ledger recording all architectural modifications, training runs, and benchmark metrics chronological-order.
 
 ---
 
@@ -28,11 +30,13 @@ source .venv-v3/bin/activate
 streamlit run dashboard.py
 ```
 
-*Inside the dashboard sidebar, you can select the active model version dropdown to toggle between **TUS-GAN v3** and **TUS-GAN v4** weights dynamically.*
+*Inside the dashboard sidebar, you can select the active model version dropdown to toggle between all available model versions dynamically.*
 
 ---
 
 ## 📈 Version Documentation Quick-Links
 
-*   **TUS-GAN v3 Details**: [tusgan-v3.md](file:///home/venkat/projects/tusgan-v3/tusgan-v3.md)
-*   **TUS-GAN v4 Upgrades**: [v4/README.md](file:///home/venkat/projects/tusgan-v3/v4/README.md) and [tusgan-v4.md](file:///home/venkat/projects/tusgan-v3/tusgan-v4.md)
+*   **TUS-GAN v3 Details**: [tusgan-v3.md](tusgan-v3.md)
+*   **TUS-GAN v4 Upgrades**: [v4/README.md](v4/README.md) and [tusgan-v4.md](tusgan-v4.md)
+*   **TUS-GAN v5 Upgrades**: [tusgan-v5.md](tusgan-v5.md)
+*   **TUS-GAN v6 Upgrades**: [tusgan-v6.md](tusgan-v6.md)
