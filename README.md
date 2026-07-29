@@ -593,18 +593,9 @@ This project is licensed under the **MIT License** — see the [pyproject.toml](
 
 ---
 
-## 🙏 Acknowledgments
-
-- **Ministry of Statistics & Programme Implementation (MoSPI), India** — for the Indian Time Use Survey 2019 data
-- **ICATUS 2019** — for the standardized activity classification framework
-- **PyTorch** — for the deep learning framework
-- The GAN research community for foundational work on WGAN-GP, Gumbel-Softmax, and contrastive learning
-
----
-
 <div align="center">
 
-**Built with ❤️ for computational social science**
+**to be continued(sequal soon) ...**
 
 [⬆ Back to Top](#)
 
