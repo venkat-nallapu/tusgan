@@ -577,7 +577,7 @@ If you use TUS-GAN in your research, please cite:
 
 ```bibtex
 @software{tusgan2026,
-  author       = {Venkat Nallapu},
+  author       = {Venkat Nallapu , Harshitha Thota},
   title        = {{TUS-GAN}: Conditional Time-Use Diary Synthesis via Generative Adversarial Networks},
   year         = {2026},
   url          = {https://github.com/venkat-nallapu/tusgan},
