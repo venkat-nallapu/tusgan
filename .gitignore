@@ -15,8 +15,13 @@ __pycache__/
 # Data and Checkpoints
 *.pth
 *.zip
+slide_images/
 
 # Logs and outputs
 runs/
 samples/
 .ipynb_checkpoints/
+
+# presentations
+*.html
+*.pptx
