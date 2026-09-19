@@ -1,0 +1,10 @@
+TUS-GAN v5.1 (Cell D) Evaluation Summary
+JSD: 0.003114
+Transition_FNorm: 0.366478
+Average_EMD: 17.00
+Employment_EMD: 25.92
+Empirical_Child_Labor_Rate: 6.19%
+Raw_Model_Child_Labor_Rate: 0.00%
+Delivered_Child_Labor_Rate: 0.00%
+Adversarial_Accuracy: 0.6991
+Adversarial_AUC: 0.7724

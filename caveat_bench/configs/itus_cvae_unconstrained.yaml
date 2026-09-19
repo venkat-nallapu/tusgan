@@ -1,0 +1,46 @@
+logging_params:
+  log_dir: "outputs/actvae_logs"
+  name: "cvae_unconstrained"
+
+seed: 42
+
+schedules_path: "data/real_train_schedules.csv"
+attributes_path: "data/real_train_attributes.csv"
+
+loader_params:
+  train_batch_size: 1024
+  val_batch_size: 1024
+  num_workers: 2
+  val_split: 0.1
+
+trainer_params:
+  min_epochs: 20
+  max_epochs: 100
+  patience: 15
+
+encoder_params:
+  name: "discrete"
+  step_size: 30
+  duration: 1440
+  jitter: 0.0
+
+labels_encoder:
+  name: "tokens"
+  weighting: unit
+  labels:
+    is_child: nominal
+    gender: nominal
+    sector: nominal
+    state: nominal
+
+model_params:
+  name: "CondDiscCNN2D"
+  latent_dim: 16
+  hidden_layers: [256, 256, 256, 256]
+  dropout: 0.1
+
+experiment_params:
+  LR: 0.001
+  weight_decay: 0.0001
+  scheduler_gamma: 0.98
+  kld_weight: 0.005

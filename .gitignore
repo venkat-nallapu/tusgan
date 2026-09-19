@@ -11,17 +11,38 @@ env/
 __pycache__/
 *.py[cod]
 *.so
+*.egg-info/
+build/
+dist/
 
 # Data and Checkpoints
 *.pth
 *.zip
+*.npz
 slide_images/
+*.ckpt
+epoch_*.pt
+checkpoints_seed*/
 
 # Logs and outputs
 runs/
 samples/
+*.tfevents*
+caveat_bench/outputs/actvae_logs/
 .ipynb_checkpoints/
 
 # presentations
 *.html
 *.pptx
+
+# publications
+publish/
+add_plots/
+
+# System / OS Artifacts
+*:Zone.Identifier*
+.DS_Store
+Thumbs.db
+
+# caveat
+caveat/

@@ -35,13 +35,21 @@ def get_generator_class(version_key: str):
 # Default paths (local — no HuggingFace downloads)
 # ---------------------------------------------------------------------------
 CHECKPOINT_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "checkpoints", "final.pt"
+    os.path.dirname(os.path.abspath(__file__)), "v4", "checkpoints", "final.pt"
 )
 DATA_NPZ_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "v3",
+    "data",
     "tusgan_encode.npz",
 )
+if not os.path.exists(DATA_NPZ_PATH):
+    for _alt in [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "v4", "tusgan_encode.npz"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "v3", "tusgan_encode.npz"),
+    ]:
+        if os.path.exists(_alt):
+            DATA_NPZ_PATH = _alt
+            break
 
 # ---------------------------------------------------------------------------
 # Labels & colours
@@ -1264,7 +1272,7 @@ def main():
 
     st.sidebar.title("Configuration")
     version = st.sidebar.selectbox(
-        "Model Version", ["TUS-GAN v3 (Baseline)", "TUS-GAN v4", "TUS-GAN v5"], index=2
+        "Model Version", ["TUS-GAN v3 (Baseline)", "TUS-GAN v4 (Production 🏆)", "TUS-GAN v5"], index=1
     )
     page = st.sidebar.selectbox("Navigation", ["Generate Diary", "Evaluation Results"])
 
@@ -1299,9 +1307,14 @@ def main():
             os.path.dirname(os.path.abspath(__file__)), "v5", "tusgan_encode.npz"
         )
         eval_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "v5", "evaluation_v5_100k"
+            os.path.dirname(os.path.abspath(__file__)), "v5", "results"
         )
+        if not os.path.exists(eval_dir):
+            eval_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "v5", "evaluation_v5_100k")
         version_label = "TUS-GAN v5"
+
+    if not os.path.exists(data_path) and os.path.exists(DATA_NPZ_PATH):
+        data_path = DATA_NPZ_PATH
 
     G, cfg, data = load_model_and_data(version_key, ckpt_path, data_path)
 
