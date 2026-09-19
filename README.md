@@ -4,8 +4,8 @@
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Target: Elsevier TRC](https://img.shields.io/badge/Target-Elsevier%20TRC-007398.svg)](https://www.sciencedirect.com/journal/transportation-research-part-c-emerging-technologies)
-[![Best Model: v4](https://img.shields.io/badge/Production%20Model-v4%20(JSD%200.000083)-success.svg)](tusgan/v4/)
-[![Caveat Benchmark: Table 8](https://img.shields.io/badge/Caveat%20Benchmark-Table%208%20Validated-brightgreen.svg)](tusgan/caveat_bench/)
+[![Best Model: v4](https://img.shields.io/badge/Production%20Model-v4%20(JSD%200.000083)-success.svg)](v4/)
+[![Caveat Benchmark: Table 8](https://img.shields.io/badge/Caveat%20Benchmark-Table%208%20Validated-brightgreen.svg)](caveat_bench/)
 
 > **Official implementation of TUS-GAN: Synthesizing Privacy-Preserving, Hyper-Realistic 24-Hour Daily Human Activity Schedules Conditioned on Detailed Demographic and Spatial Profiles.**  
 > Trained on the complete **Indian Time Use Survey (ITUS) 2019** microdata ($N = 445{,}268$ individual diaries).
