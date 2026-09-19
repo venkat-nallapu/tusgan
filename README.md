@@ -83,21 +83,38 @@ To understand the interaction between **neural backbones** (CNN vs. Transformer)
 
 | Cell | Backbone | Constraint Mechanism | Channel 0 Gradient Norm | Macro JSD | Training Stability |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| **Cell A (v4 🏆)** | **CNN** | **Soft Penalty ($\lambda=10$)** | **$1.16 \times 10^{-1}$ (Active)** | **$\mathbf{0.000083}$** | **Optimal** |
-| **Cell B (v5)** | Transformer | Hard Logit Mask ($-10^9$) | **$0.000000$ (DEAD)** | $0.001557$ | Degraded ($19\times$ collapse) |
-| **Cell C (v4.1)** | CNN | Hard Logit Mask ($-10^9$) | **$0.000000$ (DEAD)** | Collapsed | Complete Divergence |
-| **Cell D (v5.1)** | Transformer | Soft Penalty ($\lambda=10$) | **$2.911238$ (Active)** | $0.004534$ | Stable (Gradient Restored) |
+| **Cell A (v4 🏆)** | **CNN** | **Soft Penalty ($\lambda = 10$)** | **$1.16 \times 10^{-1}$ (Active)** | **0.000083** | **Optimal** |
+| **Cell B (v5)** | Transformer | Hard Logit Mask ($-10^9$) | **0.000000 (DEAD)** | 0.001557 | Degraded ($19\times$ collapse) |
+| **Cell C (v4.1)** | CNN | Hard Logit Mask ($-10^9$) | **0.000000 (DEAD)** | Collapsed | Complete Divergence |
+| **Cell D (v5.1)** | Transformer | Soft Penalty ($\lambda = 10$) | **2.911238 (Active)** | 0.004534 | Stable (Gradient Restored) |
 
 #### Mathematical Proof of the Dead-Gradient Theorem
+
 When deterministic hard logit masking clamps Channel 0 logits ($\tilde{z}_k = -10^9$ for children):
-$$\mathcal{S}(\tilde{z}_k) = \frac{\exp(-10^9)}{\sum_j \exp(z_j)} \equiv 0.0$$
+
+$$
+\mathcal{S}(\tilde{z}_k) = \frac{\exp(-10^9)}{\sum_j \exp(z_j)} \equiv 0.0
+$$
+
 The derivative of the softmax function with respect to input logits is:
-$$\frac{\partial \mathcal{S}_i}{\partial z_j} = \mathcal{S}_i(\delta_{ij} - \mathcal{S}_j)$$
+
+$$
+\frac{\partial \mathcal{S}_i}{\partial z_j} = \mathcal{S}_i(\delta_{ij} - \mathcal{S}_j)
+$$
+
 For the constrained channel $k$:
-$$\frac{\partial \mathcal{S}_k}{\partial z_k} = \mathcal{S}_k(1 - \mathcal{S}_k) = 0 \times (1 - 0) \equiv 0$$
+
+$$
+\frac{\partial \mathcal{S}_k}{\partial z_k} = \mathcal{S}_k(1 - \mathcal{S}_k) = 0 \times (1 - 0) \equiv 0
+$$
+
 By application of the chain rule:
-$$\nabla_\theta \mathcal{L} = \frac{\partial \mathcal{L}}{\partial \mathcal{S}_k} \cdot \frac{\partial \mathcal{S}_k}{\partial z_k} \cdot \frac{\partial z_k}{\partial \theta} \equiv \mathbf{0}$$
-Deterministic logit masking severs backpropagation through the constrained channel across **both CNNs and Transformers**. Replacing hard clamping with a differentiable soft penalty ($\mathcal{L}_{\text{child}} = \lambda \cdot \text{ReLU}(\hat{y}_{:, 0, :, :})$) restores healthy backpropagation while reducing raw violations to $<0.30\%$.
+
+$$
+\nabla_\theta \mathcal{L} = \frac{\partial \mathcal{L}}{\partial \mathcal{S}_k} \cdot \frac{\partial \mathcal{S}_k}{\partial z_k} \cdot \frac{\partial z_k}{\partial \theta} \equiv \mathbf{0}
+$$
+
+**Conclusion**: Deterministic logit masking severs backpropagation through the constrained channel across **both CNNs and Transformers**. Replacing hard clamping with a differentiable soft penalty ($\mathcal{L}_{\text{child}} = \lambda \cdot \text{ReLU}(\hat{y}_{:, 0, :, :})$) restores healthy backpropagation while reducing raw violations to $< 0.30\%$.
 
 ---
 
@@ -230,17 +247,35 @@ flowchart TD
 
 The overall objective optimizes a multi-task minimax objective with Wasserstein distance, gradient penalty, auxiliary classification, time-slice transitions, and soft neuro-symbolic domain constraints:
 
-$$\min_G \max_{D \in \mathcal{D}} \mathcal{L}_{\text{WGAN-GP}}(D, G) + \lambda_{\text{cond}} \mathcal{L}_{\text{cond}}(G) + \lambda_{\text{trans}} \mathcal{L}_{\text{trans}}(G) + \lambda_{\text{child}} \mathcal{L}_{\text{child}}(G)$$
+$$
+\min_G \max_{D \in \mathcal{D}} \mathcal{L}_{\text{WGAN-GP}}(D, G) + \lambda_{\text{cond}} \mathcal{L}_{\text{cond}}(G) + \lambda_{\text{trans}} \mathcal{L}_{\text{trans}}(G) + \lambda_{\text{child}} \mathcal{L}_{\text{child}}(G)
+$$
 
 1. **WGAN-GP Loss**:
-   $$\mathcal{L}_{\text{WGAN-GP}} = \mathbb{E}[D(\tilde{x}, c)] - \mathbb{E}[D(x, c)] + \lambda_{\text{gp}} \mathbb{E}\left[(\|\nabla_{\hat{x}} D(\hat{x}, c)\|_2 - 1)^2\right]$$
+
+   $$
+   \mathcal{L}_{\text{WGAN-GP}} = \mathbb{E}[D(\tilde{x}, c)] - \mathbb{E}[D(x, c)] + \lambda_{\text{gp}} \mathbb{E}\left[(\|\nabla_{\hat{x}} D(\hat{x}, c)\|_2 - 1)^2\right]
+   $$
+
 2. **4-Quadrant Time-Slice Transition Matrix Loss**:
-   $$\mathcal{L}_{\text{trans}} = \frac{1}{4} \sum_{k=0}^{3} \left\| \mathbf{P}_{\text{fake}}^{(k)} - \mathbf{P}_{\text{real}}^{(k)} \right\|_F^2$$
+
+   $$
+   \mathcal{L}_{\text{trans}} = \frac{1}{4} \sum_{k=0}^{3} \left\| \mathbf{P}_{\text{fake}}^{(k)} - \mathbf{P}_{\text{real}}^{(k)} \right\|_F^2
+   $$
+
    Where $k \in \{0, 1, 2, 3\}$ corresponds to Morning (04:00–10:00), Afternoon (10:00–16:00), Evening (16:00–22:00), and Night (22:00–04:00).
+
 3. **Decoupled AC-GAN Loss**:
-   $$\mathcal{L}_{\text{cond}} = \text{BCEWithLogitsLoss}(C(\tilde{x}), c_{\text{demographics}})$$
+
+   $$
+   \mathcal{L}_{\text{cond}} = \text{BCEWithLogitsLoss}(C(\tilde{x}), c_{\text{demographics}})
+   $$
+
 4. **Soft Neuro-Symbolic Child Labor Penalty**:
-   $$\mathcal{L}_{\text{child}} = \lambda_{\text{child}} \cdot \frac{1}{B} \sum_{b=1}^{B} \mathbb{I}(\text{age}_b < 15) \cdot \sum_{t=1}^{48} \tilde{x}_{b, 0, t}$$
+
+   $$
+   \mathcal{L}_{\text{child}} = \lambda_{\text{child}} \cdot \frac{1}{B} \sum_{b=1}^{B} \mathbb{I}(\text{age}_b < 15) \cdot \sum_{t=1}^{48} \tilde{x}_{b, 0, t}
+   $$
 
 ---
 
