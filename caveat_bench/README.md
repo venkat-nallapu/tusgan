@@ -73,10 +73,11 @@ bash run_all.sh
 
 ## 4. Running on Kaggle (T4 × 2 GPU) — Recommended
 
-Because training two ActVAE models takes ~1 to 1.5 hours on GPU, Kaggle (Dual T4 GPUs, 30 GB RAM) is the fastest and safest platform.
+Because training two ActVAE models takes ~1 to 2 hours on GPU, Kaggle (Dual T4 GPUs, 30 GB RAM) or Google Colab is the fastest and safest platform.
+A ready-to-run Jupyter notebook [`caveat_benchmark_kaggle.ipynb`](file:///home/venkat/projects/tusgan/caveat_bench/caveat_benchmark_kaggle.ipynb) is provided in this directory.
 
 ### Step A: Prepare Zip File
-Zip your local `caveat_bench` directory (which already contains the 31 MB pre-generated CSV data in `data/`):
+Zip your local `caveat_bench` directory (which already contains the 31 MB pre-generated CSV data in `data/` and updated 250-epoch configs):
 ```bash
 cd /home/venkat/projects/tusgan
 zip -r caveat_bench.zip caveat_bench -x "caveat_bench/outputs/actvae_logs/*"
@@ -84,7 +85,7 @@ zip -r caveat_bench.zip caveat_bench -x "caveat_bench/outputs/actvae_logs/*"
 Upload `caveat_bench.zip` to Kaggle as a private Dataset or directly into the Notebook working directory.
 
 ### Step B: Notebook Execution Cells
-Create a Kaggle notebook with **GPU T4 × 2** accelerator enabled, and paste these cells:
+Create a Kaggle notebook with **GPU T4 × 2** accelerator enabled, or open `caveat_benchmark_kaggle.ipynb`, and execute:
 
 ```python
 # [Cell 1]: Install dependencies and clone Caveat package
@@ -96,10 +97,10 @@ Create a Kaggle notebook with **GPU T4 × 2** accelerator enabled, and paste the
 !unzip -q /kaggle/input/your-dataset-name/caveat_bench.zip -d /kaggle/working/
 %cd /kaggle/working/caveat_bench
 
-# [Cell 3]: Train Unconstrained ActVAE Baseline (~30 mins)
+# [Cell 3]: Train Unconstrained ActVAE Baseline (250 Epochs Parity)
 !python train_actvae.py --config configs/itus_cvae_unconstrained.yaml
 
-# [Cell 4]: Train Soft-Constrained ActVAE Baseline (~30 mins)
+# [Cell 4]: Train Soft-Constrained ActVAE Baseline (250 Epochs Parity, lambda=10.0)
 !python train_actvae.py --config configs/itus_cvae_soft.yaml
 
 # [Cell 5]: Run ActEval Multi-Domain Evaluation Suite (~30 mins)

@@ -113,7 +113,7 @@ class DownsampleBlock(nn.Module):
 class Critic(nn.Module):
     def __init__(
         self,
-        cond_dim: int = 83,
+        cond_dim: int = 82,
         num_districts: int = 71,
         num_states: int = 36,
         district_embed_dim: int = 16,
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     D = Critic()
     real = torch.randn(BATCH, 9, 48, 1)
     fake = torch.randn(BATCH, 9, 48, 1)
-    cv = torch.zeros(BATCH, 83)
+    cv = torch.zeros(BATCH, 82)
     di = torch.randint(0, 71, (BATCH,))
     si = torch.randint(0, 36, (BATCH,))
     scores = D(real, cv, di, si)

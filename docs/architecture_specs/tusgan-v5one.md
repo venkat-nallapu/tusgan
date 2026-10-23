@@ -26,7 +26,7 @@ The v5.1 architecture combines the global receptive field of self-attention with
 ### System Mapping & Data Flow
 ```mermaid
 graph TD
-    Z["Latent Noise (128-dim)"] & C["Demographics (83-dim)"] --> Gen["Generator (Transformer Backbone)"]
+    Z["Latent Noise (128-dim)"] & C["Demographics (82-dim)"] --> Gen["Generator (Transformer Backbone)"]
     Gen --> L["Raw Pre-activation Logits (Unmasked in Training)"]
     
     L --> GS["Gumbel-Softmax Layer"]

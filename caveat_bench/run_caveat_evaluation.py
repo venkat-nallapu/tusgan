@@ -11,6 +11,7 @@ Generates:
 import os
 import sys
 import argparse
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from acteval.evaluate import Evaluator
@@ -61,30 +62,51 @@ def main():
     print(f"   ✓ Real Ground-Truth Diaries: {target_schedules['pid'].nunique():,}")
     print(f"   ✓ Empirical Child Labor Base Rate: {real_child_rate:.2f}% (Matches verified 3.87% benchmark)")
 
-    # Candidates mapping
-    candidate_files = {
-        "Cell A (v4 Conv Unconstrained)": "synth_cell_a_schedules.csv",
-        "Cell B (v5 Trans Hard Mask)": "synth_cell_b_schedules.csv",
-        "Cell D (v5.1 Trans Soft Penalty)": "synth_cell_d_schedules.csv",
-        "ActVAE (Unconstrained CVAE)": "synth_vae_unconstrained_schedules.csv",
-        "ActVAE + Soft (C1 Penalty)": "synth_vae_soft_schedules.csv",
-    }
+    # Candidates mapping: (display_name, schedules_filename, preferred_attributes_filename)
+    candidate_specs = [
+        ("Cell A (v4 Conv Soft)", "synth_cell_a_schedules.csv", "synth_cell_a_attributes.csv"),
+        ("Cell B (v5 Trans Hard Mask)", "synth_cell_b_schedules.csv", "synth_cell_b_attributes.csv"),
+        ("Cell D (v5.1 Trans Soft Penalty)", "synth_cell_d_schedules.csv", "synth_cell_d_attributes.csv"),
+        ("ActVAE (Unconstrained CVAE)", "synth_vae_unconstrained_schedules.csv", "synth_vae_unconstrained_attributes.csv"),
+        ("ActVAE + Soft (C1 Penalty)", "synth_vae_soft_schedules.csv", "synth_vae_soft_attributes.csv"),
+    ]
 
     synthetic_models = {}
     synthetic_attrs = {}
     child_labor_rates = {}
 
-    for name, filename in candidate_files.items():
-        path = os.path.join(data_dir, filename)
-        if os.path.exists(path):
-            df_sched = pd.read_csv(path)
-            synthetic_models[name] = df_sched
-            synthetic_attrs[name] = target_attributes.copy()
-            c_rate = compute_child_labor_rate(df_sched, target_attributes)
-            child_labor_rates[name] = c_rate
-            print(f"   ✓ Loaded {name} ({df_sched['pid'].nunique():,} diaries, Child Labor: {c_rate:.2f}%)")
-        else:
-            print(f"   ⚠️ Optional Candidate '{name}' not found at {path} (run train_actvae.py or tusgan_to_caveat.py)")
+    for name, sched_filename, attr_filename in candidate_specs:
+        sched_path = os.path.join(data_dir, sched_filename)
+        if not os.path.exists(sched_path):
+            print(f"   ⚠️ Optional Candidate '{name}' not found at {sched_path} (run train_actvae.py or tusgan_to_caveat.py)")
+            continue
+
+        df_sched = pd.read_csv(sched_path)
+        synthetic_models[name] = df_sched
+
+        # Determine matching attributes file
+        attr_path = os.path.join(data_dir, attr_filename)
+        df_attr = None
+        if os.path.exists(attr_path):
+            df_attr = pd.read_csv(attr_path)
+        elif "vae" in sched_filename.lower():
+            # Search in actvae_logs if not yet mirrored into data/
+            log_pattern = "cvae_soft_constrained" if "soft" in sched_filename.lower() else "cvae_unconstrained"
+            matches = list(Path(args.output_dir).glob(f"actvae_logs/**/{log_pattern}/**/synthetic_attributes.csv")) or \
+                      list(Path("outputs").glob(f"actvae_logs/**/{log_pattern}/**/synthetic_attributes.csv"))
+            if matches:
+                df_attr = pd.read_csv(sorted(matches)[-1])
+
+        # If not found or if PIDs match test set, fallback to target_attributes
+        if df_attr is None:
+            df_attr = target_attributes.copy()
+        elif "Unnamed: 0" in df_attr.columns:
+            df_attr = df_attr.drop(columns=["Unnamed: 0"])
+
+        synthetic_attrs[name] = df_attr
+        c_rate = compute_child_labor_rate(df_sched, df_attr)
+        child_labor_rates[name] = c_rate
+        print(f"   ✓ Loaded {name} ({df_sched['pid'].nunique():,} diaries, Child Labor: {c_rate:.2f}%)")
 
     if not synthetic_models:
         print("❌ No synthetic models found to evaluate! Exiting.")
@@ -118,17 +140,26 @@ def main():
     for name, rate in child_labor_rates.items():
         print(f"   - {name:<36}: {rate:.2f}%")
 
-    # Export Table 8 CSV
-    out_table_path = os.path.join(args.output_dir, "table8_caveat_evaluation.csv")
+    # Save detailed ActEval hierarchy into dedicated folder to avoid IsADirectoryError
+    acteval_dir = os.path.join(args.output_dir, "acteval_breakdown")
     if hasattr(results, "save"):
-        results.save(out_table_path)
-    else:
-        summary_df.to_csv(out_table_path)
-    print(f"\n📁 Saved Table 8 to: {out_table_path}")
+        results.save(acteval_dir)
+        print(f"\n📁 Saved ActEval detailed metrics to: {acteval_dir}")
+
+    # Export Table 8 Summary CSV as a flat CSV file
+    out_table_path = os.path.join(args.output_dir, "table8_caveat_evaluation.csv")
+    if os.path.isdir(out_table_path):
+        import shutil
+        shutil.rmtree(out_table_path)
+    summary_df.to_csv(out_table_path)
+    print(f"📁 Saved Table 8 summary CSV to: {out_table_path}")
 
     # Also copy to publish/plan if directory exists
     if os.path.exists(publish_dir):
         pub_path = os.path.join(publish_dir, "table8_caveat_evaluation.csv")
+        if os.path.isdir(pub_path):
+            import shutil
+            shutil.rmtree(pub_path)
         summary_df.to_csv(pub_path)
         print(f"📁 Mirrored Table 8 to: {pub_path}")
 

@@ -113,7 +113,7 @@ class Generator(nn.Module):
     def __init__(
         self,
         noise_dim: int = 128,
-        cond_dim: int = 83,  # v2 OH dims
+        cond_dim: int = 82,  # 82 OH demographic dims
         num_districts: int = 71,
         num_states: int = 36,
         district_embed_dim: int = 16,

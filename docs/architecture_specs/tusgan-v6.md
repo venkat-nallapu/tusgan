@@ -3,7 +3,7 @@
 ## 🛑 Setbacks in Previous Version (v5)
 - **Degradation of Statistical Realism:** The shift to a Transformer backbone in v5 successfully achieved 0% logical violations via deterministic masking, but severely harmed JSD (from 0.000083 in v4 to 0.001557) and F-Norm.
 - **Dead Gradients:** The Deterministic Logit Masking (`-1e9`) zeroed out the gradients for forbidden states. The Generator never *learned* the rules, creating a jagged distribution manifold that ruined the statistical metrics.
-- **Shallow Temporal Capacity:** The v5 Transformer only used 2 layers and 4 heads. It lacked the parameter depth required to model 83 demographics over 48 time slots.
+- **Shallow Temporal Capacity:** The v5 Transformer only used 2 layers and 4 heads. It lacked the parameter depth required to model 82 demographics over 48 time slots.
 - **Absolute Positional Rigidity:** The v5 model used a learned absolute positional embedding, forcing it to memorize specific times of day rather than understanding relative human sequences (e.g., "Commute usually follows Wake-up").
 
 ## 🚀 What's New in this Version [Proposed Features & Add-ons]

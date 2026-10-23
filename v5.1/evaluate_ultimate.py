@@ -79,15 +79,82 @@ def load_generator(checkpoint_path: str, data_path: str, device: torch.device):
     return G, cfg.get("noise_dim", 128)
 
 
-def load_real_data(data_path: str):
+def resolve_split_indices(split="test", split_indices_path=None, npz_path=None):
+    """
+    Resolves and loads the 90/10 train/test partition indices.
+    """
+    if split is None or str(split).lower() == "all":
+        return None
+
+    if split_indices_path and os.path.exists(split_indices_path):
+        indices = np.load(split_indices_path)
+        print(f"📁 Loaded explicit split indices from {split_indices_path} ({len(indices):,} records)")
+        return indices
+
+    fname = f"{str(split).lower()}_indices.npy"
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+
+    candidates = [
+        fname,
+        os.path.join(script_dir, fname),
+        os.path.join(script_dir, "..", "data", fname),
+        os.path.join("data", fname),
+        os.path.join("..", "data", fname),
+    ]
+    if npz_path:
+        npz_dir = os.path.dirname(os.path.abspath(npz_path))
+        candidates.extend([
+            os.path.join(npz_dir, fname),
+            os.path.join(npz_dir, "..", "data", fname),
+            os.path.join(npz_dir, "data", fname),
+        ])
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            indices = np.load(cand)
+            print(f"📁 Loaded split '{split}' from {cand} ({len(indices):,} records)")
+            return indices
+
+    print(f"⚠️ Warning: Split indices for '{split}' not found in candidates. Using full dataset.")
+    return None
+
+
+def load_real_data(data_path: str, split: str = "test", split_indices: str = None):
+    if not os.path.exists(data_path):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            data_path,
+            os.path.join(script_dir, data_path),
+            os.path.join(script_dir, "tusgan_encode.npz"),
+            os.path.join(script_dir, "..", "data", "tusgan_encode.npz"),
+            os.path.join(script_dir, "..", "v4", "tusgan_encode.npz"),
+            "tusgan_encode.npz",
+            "data/tusgan_encode.npz",
+            "v4/tusgan_encode.npz",
+        ]
+        for cand in candidates:
+            if os.path.exists(cand):
+                data_path = cand
+                break
+
     data = np.load(data_path)
-    print(f"✅ Loaded real data from {data_path} ({data['diary_tensor'].shape[0]:,} diaries)")
-    return (
-        data["diary_tensor"],
-        data["cond_vector"],
-        data["district_ids"],
-        data["state_ids"],
-    )
+    diary = data["diary_tensor"]
+    cond = data["cond_vector"]
+    district = data["district_ids"]
+    state = data["state_ids"]
+
+    split_idx = resolve_split_indices(split=split, split_indices_path=split_indices, npz_path=data_path)
+    if split_idx is not None:
+        diary = diary[split_idx]
+        cond = cond[split_idx]
+        district = district[split_idx]
+        state = state[split_idx]
+        split_info = f" (split='{split}', {len(diary):,} records)"
+    else:
+        split_info = " (full dataset)"
+
+    print(f"✅ Loaded real data from {data_path}{split_info}")
+    return diary, cond, district, state
 
 
 @torch.no_grad()
@@ -256,6 +323,19 @@ def main():
     parser.add_argument("--data", type=str, default="tusgan_encode.npz", help="Path to real data .npz")
     parser.add_argument("--n_samples", type=int, default=50000, help="Number of diaries to generate for evaluation")
     parser.add_argument("--output_dir", type=str, default="evaluation_results", help="Directory to save exhibits")
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="test",
+        choices=["train", "test", "all"],
+        help="Dataset split: 'test' (10%%, 44,527 records), 'train' (90%%, 400,741 records), or 'all'",
+    )
+    parser.add_argument(
+        "--split_indices",
+        type=str,
+        default=None,
+        help="Explicit path to split indices .npy file",
+    )
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -263,7 +343,9 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # 1. Load Data & Model
-    real_tensor, real_cond, real_dists, real_states = load_real_data(args.data)
+    real_tensor, real_cond, real_dists, real_states = load_real_data(
+        args.data, split=args.split, split_indices=args.split_indices
+    )
     G, noise_dim = load_generator(args.checkpoint, args.data, device)
 
     eval_n = min(args.n_samples, real_tensor.shape[0])
@@ -282,8 +364,14 @@ def main():
     )
     fake_codes_del = decode_to_codes(fake_tensor_del)
 
-    real_sub = real_tensor[:eval_n]
-    real_cond_sub = real_cond[:eval_n]
+    N_avail = real_tensor.shape[0]
+    if eval_n < N_avail:
+        sample_idx = np.random.choice(N_avail, size=eval_n, replace=False)
+        real_sub = real_tensor[sample_idx]
+        real_cond_sub = real_cond[sample_idx]
+    else:
+        real_sub = real_tensor
+        real_cond_sub = real_cond
     real_codes = decode_to_codes(real_sub)
 
     # 4. Standard Metrics (computed on raw model to judge learned statistical manifold)

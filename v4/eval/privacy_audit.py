@@ -42,6 +42,33 @@ from critic import Critic
 from train import DemographicClassifier
 
 
+def resolve_split_indices(split: str = "train", split_indices_path: str = None, npz_path: str = None):
+    """Resolves and loads partition indices."""
+    if split_indices_path and os.path.exists(split_indices_path):
+        return np.load(split_indices_path)
+
+    fname = f"{str(split).lower()}_indices.npy"
+    candidates = [
+        fname,
+        os.path.join(CURRENT_DIR, fname),
+        os.path.join(V4_DIR, fname),
+        os.path.join(ROOT_DIR, "data", fname),
+        os.path.join("data", fname),
+        os.path.join("..", "data", fname),
+    ]
+    if npz_path:
+        npz_dir = os.path.dirname(os.path.abspath(npz_path))
+        candidates.extend([
+            os.path.join(npz_dir, fname),
+            os.path.join(npz_dir, "..", "data", fname),
+        ])
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            return np.load(cand)
+    return None
+
+
 def load_v4_models(checkpoint_path: str, device: torch.device):
     """Load Generator (EMA), Critic, and DemographicClassifier from checkpoint."""
     if not os.path.exists(checkpoint_path):
@@ -212,6 +239,8 @@ def run_privacy_audit():
     parser.add_argument("--n_train_pool", type=int, default=25000, help="Size of training pool for DCR")
     parser.add_argument("--n_test_pool", type=int, default=10000, help="Size of test pool for DCR")
     parser.add_argument("--n_mia_eval", type=int, default=5000, help="Number of members/non-members for MIA")
+    parser.add_argument("--train_indices", type=str, default=None, help="Path to train_indices.npy")
+    parser.add_argument("--test_indices", type=str, default=None, help="Path to test_indices.npy")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
 
@@ -226,13 +255,17 @@ def run_privacy_audit():
     diaries, conds, dists, states = load_dataset(args.data_path)
     N_total = len(diaries)
 
-    # Split into 80% Train, 20% Held-out Test
-    indices = np.random.permutation(N_total)
-    split_idx = int(0.8 * N_total)
-    train_idx = indices[:split_idx]
-    test_idx = indices[split_idx:]
+    # Load 90/10 deterministic partition
+    train_idx = resolve_split_indices("train", args.train_indices, args.data_path)
+    test_idx = resolve_split_indices("test", args.test_indices, args.data_path)
+    if train_idx is None or test_idx is None:
+        print("⚠️ Split indices not found; falling back to 80/20 permutation.")
+        indices = np.random.permutation(N_total)
+        split_idx = int(0.8 * N_total)
+        train_idx = indices[:split_idx]
+        test_idx = indices[split_idx:]
 
-    print(f"📊 Dataset split: Train={len(train_idx):,} records, Test={len(test_idx):,} records")
+    print(f"📊 Dataset partition: Train={len(train_idx):,} records, Test={len(test_idx):,} records")
 
     # Sample sub-pools for high-speed matrix auditing
     sub_train_idx = np.random.choice(train_idx, size=min(args.n_train_pool, len(train_idx)), replace=False)

@@ -70,6 +70,7 @@ def load_generator(checkpoint_path: str, data_path: str, device: torch.device):
     """
     from generator import Generator
 
+    data_path = find_data_file(data_path)
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     cfg = ckpt["config"]
 
@@ -107,14 +108,76 @@ def load_generator(checkpoint_path: str, data_path: str, device: torch.device):
     return G, cfg
 
 
+def find_data_file(data_path: str):
+    if os.path.exists(data_path):
+        return data_path
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+    candidates = [
+        data_path,
+        os.path.join(script_dir, data_path),
+        os.path.join(script_dir, os.path.basename(data_path)),
+        os.path.join(script_dir, "tusgan_encode.npz"),
+        os.path.join(script_dir, "..", "data", "tusgan_encode.npz"),
+        os.path.join(script_dir, "..", "v4", "tusgan_encode.npz"),
+        os.path.join("wgan-gp", data_path),
+        "tusgan_encode.npz",
+        "data/tusgan_encode.npz",
+        "v4/tusgan_encode.npz",
+    ]
+    for cand in candidates:
+        if os.path.exists(cand):
+            return cand
+    return data_path
+
+
+def resolve_split_indices(split="test", split_indices_path=None, npz_path=None):
+    """
+    Resolves and loads the 90/10 train/test partition indices.
+    """
+    if split is None or str(split).lower() == "all":
+        return None
+
+    if split_indices_path and os.path.exists(split_indices_path):
+        indices = np.load(split_indices_path)
+        print(f"📁 Loaded explicit split indices from {split_indices_path} ({len(indices):,} records)")
+        return indices
+
+    fname = f"{str(split).lower()}_indices.npy"
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+
+    candidates = [
+        fname,
+        os.path.join(script_dir, fname),
+        os.path.join(script_dir, "..", "data", fname),
+        os.path.join("data", fname),
+        os.path.join("..", "data", fname),
+    ]
+    if npz_path:
+        npz_dir = os.path.dirname(os.path.abspath(npz_path))
+        candidates.extend([
+            os.path.join(npz_dir, fname),
+            os.path.join(npz_dir, "..", "data", fname),
+            os.path.join(npz_dir, "data", fname),
+        ])
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            indices = np.load(cand)
+            print(f"📁 Loaded split '{split}' from {cand} ({len(indices):,} records)")
+            return indices
+
+    print(f"⚠️ Warning: Split indices for '{split}' not found in candidates. Using full dataset.")
+    return None
+
+
 # ─────────────────────────────────────────────────────────────
 # 3. HELPER — LOAD REAL DATASET
 # ─────────────────────────────────────────────────────────────
 
 
-def load_real_data(data_path: str):
+def load_real_data(data_path: str, split: str = "test", split_indices: str = None):
     """
-    Load the pre-encoded ITUS 2019 dataset.
+    Load the pre-encoded ITUS 2019 dataset filtered by partition.
 
     Returns
     -------
@@ -123,19 +186,26 @@ def load_real_data(data_path: str):
     district_ids : np.ndarray  (N,)
     state_ids    : np.ndarray  (N,)
     """
-    if not os.path.exists(data_path):
-        alt = os.path.join("wgan-gp", data_path)
-        if os.path.exists(alt):
-            data_path = alt
-
+    data_path = find_data_file(data_path)
     data = np.load(data_path)
-    print(f"✅ Real data loaded from {data_path}  ({data['diary_tensor'].shape[0]:,} diaries)")
-    return (
-        data["diary_tensor"],  # (N, 9, 48, 1)
-        data["cond_vector"],  # (N, 83)
-        data["district_ids"],  # (N,)
-        data["state_ids"],  # (N,)
-    )
+
+    diary = data["diary_tensor"]
+    cond = data["cond_vector"]
+    district = data["district_ids"]
+    state = data["state_ids"]
+
+    split_idx = resolve_split_indices(split=split, split_indices_path=split_indices, npz_path=data_path)
+    if split_idx is not None:
+        diary = diary[split_idx]
+        cond = cond[split_idx]
+        district = district[split_idx]
+        state = state[split_idx]
+        split_info = f" (split='{split}', {len(diary):,} records)"
+    else:
+        split_info = " (full dataset)"
+
+    print(f"✅ Real data loaded from {data_path}{split_info}")
+    return diary, cond, district, state
 
 
 # ─────────────────────────────────────────────────────────────
@@ -458,6 +528,19 @@ def parse_args():
         default="evaluation_results",
         help="Directory for saved plots and metrics",
     )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="test",
+        choices=["train", "test", "all"],
+        help="Dataset split: 'test' (10%%, 44,527 records), 'train' (90%%, 400,741 records), or 'all'",
+    )
+    parser.add_argument(
+        "--split_indices",
+        type=str,
+        default=None,
+        help="Explicit path to split indices .npy file",
+    )
     return parser.parse_args()
 
 
@@ -477,7 +560,9 @@ def main():
     G, cfg = load_generator(args.checkpoint, args.data, device)
 
     # ── Load real data ────────────────────────────────────────
-    diary_tensor, cond_vector, district_ids, state_ids = load_real_data(args.data)
+    diary_tensor, cond_vector, district_ids, state_ids = load_real_data(
+        args.data, split=args.split, split_indices=args.split_indices
+    )
 
     # ── Generate synthetic diaries ────────────────────────────
     fake_tensor = generate_synthetic(

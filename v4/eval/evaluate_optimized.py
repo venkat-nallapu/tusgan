@@ -73,9 +73,71 @@ def load_generator(checkpoint_path: str, data_path: str, device: torch.device):
     return G, cfg
 
 
-def load_real_data(data_path: str):
+def resolve_split_indices(split: str = "test", split_indices_path: str = None, npz_path: str = None):
+    """Resolves and loads the 90/10 train/test partition indices."""
+    if split is None or str(split).lower() == "all":
+        return None
+    if split_indices_path and os.path.exists(split_indices_path):
+        return np.load(split_indices_path)
+
+    fname = f"{str(split).lower()}_indices.npy"
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+    candidates = [
+        fname,
+        os.path.join(script_dir, fname),
+        os.path.join(script_dir, "..", fname),
+        os.path.join(script_dir, "..", "..", "data", fname),
+        os.path.join("data", fname),
+        os.path.join("..", "data", fname),
+    ]
+    if npz_path:
+        npz_dir = os.path.dirname(os.path.abspath(npz_path))
+        candidates.extend([
+            os.path.join(npz_dir, fname),
+            os.path.join(npz_dir, "..", "data", fname),
+            os.path.join(npz_dir, "data", fname),
+        ])
+    for cand in candidates:
+        if os.path.exists(cand):
+            return np.load(cand)
+    return None
+
+
+def load_real_data(data_path: str, split: str = "test", split_indices: str = None):
+    if not os.path.exists(data_path):
+        script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+        candidates = [
+            os.path.join(script_dir, data_path),
+            os.path.join(script_dir, os.path.basename(data_path)),
+            os.path.join(script_dir, "..", "tusgan_encode.npz"),
+            os.path.join(script_dir, "..", "..", "data", "tusgan_encode.npz"),
+            "data/tusgan_encode.npz",
+            "v4/tusgan_encode.npz",
+            "tusgan_encode.npz",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                data_path = c
+                break
+
     data = np.load(data_path)
-    return data["diary_tensor"], data["cond_vector"], data["district_ids"], data["state_ids"]
+    diaries = data["diary_tensor"]
+    cond = data["cond_vector"]
+    dists = data["district_ids"]
+    states = data["state_ids"]
+
+    split_idx = resolve_split_indices(split=split, split_indices_path=split_indices, npz_path=data_path)
+    if split_idx is not None:
+        diaries = diaries[split_idx]
+        cond = cond[split_idx]
+        dists = dists[split_idx]
+        states = states[split_idx]
+        split_info = f" (split='{split}', {len(diaries):,} records)"
+    else:
+        split_info = " (full dataset)"
+
+    print(f"✅ Real data loaded from {data_path}: {diaries.shape[0]:,} diaries{split_info}")
+    return diaries, cond, dists, states
 
 
 def decode_to_codes(tensor_9ch: np.ndarray) -> np.ndarray:

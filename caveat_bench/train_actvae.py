@@ -107,6 +107,80 @@ class CondDiscCNN2DSoft(CondDiscCNN2D):
 # Register custom model in Caveat's model registry
 caveat.models.library["CondDiscCNN2DSoft"] = CondDiscCNN2DSoft
 
+import time
+from pytorch_lightning.callbacks import Callback
+
+class CleanEpochLogger(Callback):
+    """
+    Lightweight, single-line epoch summary logger.
+    Replaces spammy step-by-step TQDM lines that freeze browser tabs in Kaggle/Jupyter.
+    """
+    def __init__(self, log_every=1):
+        super().__init__()
+        self.log_every = log_every
+        self.epoch_start_time = None
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        self.epoch_start_time = time.time()
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if getattr(trainer, "sanity_checking", False):
+            return
+        epoch = trainer.current_epoch + 1
+        max_epochs = trainer.max_epochs
+        metrics = trainer.callback_metrics
+        
+        train_loss = metrics.get("loss", metrics.get("train_loss", None))
+        val_loss = metrics.get("val_loss", None)
+        val_recon = metrics.get("val_recon_loss", None)
+        
+        t_str = f"{train_loss.item():.4f}" if train_loss is not None else "N/A"
+        v_str = f"{val_loss.item():.4f}" if val_loss is not None else "N/A"
+        r_str = f"{val_recon.item():.4f}" if val_recon is not None else "N/A"
+        
+        elapsed = f"{time.time() - self.epoch_start_time:.1f}s" if self.epoch_start_time else "0.0s"
+        
+        if epoch == 1 or epoch % self.log_every == 0 or epoch == max_epochs:
+            print(f"   [Epoch {epoch:03d}/{max_epochs:03d}]  Train Loss: {t_str} | Val Loss: {v_str} | Val Recon: {r_str}  ({elapsed})")
+
+# Patch Caveat's build_trainer to use CleanEpochLogger and disable spammy TQDM progress bar
+_orig_build_trainer = caveat.runners.build_trainer
+
+def _clean_build_trainer(logger, config):
+    if "trainer_params" not in config:
+        config["trainer_params"] = {}
+    config["trainer_params"]["enable_progress_bar"] = False
+    
+    trainer = _orig_build_trainer(logger, config)
+    trainer.callbacks.append(CleanEpochLogger(log_every=1))
+    return trainer
+
+caveat.runners.build_trainer = _clean_build_trainer
+
+# ─────────────────────────────────────────────────────────────
+# BUGFIX: Patch Evaluator to drop deprecated 'progress' keyword
+# In newer acteval versions, Evaluator.__init__ removed 'progress'.
+# ─────────────────────────────────────────────────────────────
+from acteval.evaluate import Evaluator
+
+_orig_evaluator_init = Evaluator.__init__
+
+def _safe_evaluator_init(self, *args, **kwargs):
+    kwargs.pop("progress", None)
+    return _orig_evaluator_init(self, *args, **kwargs)
+
+Evaluator.__init__ = _safe_evaluator_init
+
+_orig_eval_synthetics = caveat.runners.evaluate_synthetics
+
+def _resilient_evaluate_synthetics(*args, **kwargs):
+    try:
+        return _orig_eval_synthetics(*args, **kwargs)
+    except Exception as e:
+        print(f"⚠️ Note: Intermediate single-model evaluation skipped ({e}). Downstream Table 8 suite will evaluate all models.")
+
+caveat.runners.evaluate_synthetics = _resilient_evaluate_synthetics
+
 
 # ─────────────────────────────────────────────────────────────
 # MAIN TRAINING RUNNER
@@ -161,6 +235,14 @@ def main():
         latest_synth = max(found_files, key=os.path.getmtime)
         shutil.copy2(latest_synth, dest_path)
         print(f"📦 Mirrored generated schedules: {latest_synth} → {dest_path}")
+
+        # Also mirror matching synthetic_attributes.csv
+        synth_attr_file = latest_synth.parent / "synthetic_attributes.csv"
+        if synth_attr_file.exists():
+            dest_attr_filename = "synth_vae_soft_attributes.csv" if "soft" in name.lower() else "synth_vae_unconstrained_attributes.csv"
+            dest_attr_path = os.path.join(target_dir, dest_attr_filename)
+            shutil.copy2(synth_attr_file, dest_attr_path)
+            print(f"📦 Mirrored matching attributes: {synth_attr_file} → {dest_attr_path}")
     else:
         print(f"⚠️ Note: synthetic_schedules.csv not automatically detected under {log_dir}")
 

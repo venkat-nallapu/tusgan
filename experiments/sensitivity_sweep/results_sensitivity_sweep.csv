@@ -1,0 +1,5 @@
+lambda_rule,raw_violation_rate_pct,delivered_violation_rate_pct,macro_jsd,adversarial_accuracy_pct,adversarial_auc_roc,discard_rate_pct,n_samples,checkpoint
+0.1,2.46,0.0,8.1e-05,65.12,0.719,2.45,50000,checkpoints/lambda_0.1/final.pt
+1.0,0.82,0.0,8.2e-05,65.28,0.721,0.82,50000,checkpoints/lambda_1.0/final.pt
+10.0,0.3,0.0,8.3e-05,65.47,0.7225,0.3,50000,v4/checkpoints/final.pt
+100.0,0.04,0.0,0.000189,68.15,0.748,0.04,50000,checkpoints/lambda_100.0/final.pt

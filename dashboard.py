@@ -16,6 +16,10 @@ import matplotlib.patches as mpatches
 import os
 import sys
 import glob
+import csv
+import io
+import json
+from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
 # Path setup — allow dynamically importing Generator based on version
@@ -1106,6 +1110,43 @@ def time_breakdown_table(decoded: np.ndarray):
     return rows
 
 
+def diaries_to_csv_bytes(records: list) -> bytes:
+    """Encode generated diaries as CSV: one row per diary, one column per
+    30-min time slot (activity code 1-9) plus the demographic/geography
+    metadata used to condition that sample."""
+    if not records:
+        return b""
+
+    fieldnames = list(records[0].keys())
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(records)
+    return buffer.getvalue().encode("utf-8")
+
+
+def diaries_to_json_bytes(records: list) -> bytes:
+    """Encode generated diaries as JSON: one object per diary, with the
+    48 flat time-slot columns expanded into a nested, labeled 'diary' list
+    (more natural for downstream JSON consumers than 48 top-level keys)."""
+    payload = []
+    for rec in records:
+        rec = dict(rec)
+        diary = []
+        for slot in TIME_SLOTS:
+            code = rec.pop(slot)
+            diary.append(
+                {
+                    "time": slot,
+                    "activity_code": code,
+                    "activity_label": ACTIVITY_LABELS.get(code, "Unknown"),
+                }
+            )
+        rec["diary"] = diary
+        payload.append(rec)
+    return json.dumps(payload, indent=2).encode("utf-8")
+
+
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
@@ -1190,6 +1231,8 @@ def page_generate(G, cfg, data):
     all_cond = data["cond_vector"]  # (N, cond_dim)
     n_real = all_cond.shape[0]
 
+    all_records = []
+
     for sample_idx in range(num_samples):
         # Pick a random real sample as template
         rand_idx = np.random.randint(0, n_real)
@@ -1230,6 +1273,48 @@ def page_generate(G, cfg, data):
         st.table(breakdown)
 
         st.divider()
+
+        # Record this diary for CSV/JSON export
+        record = {
+            "sample_id": sample_idx + 1,
+            "age_group": age_sel,
+            "gender": gender_sel,
+            "marital_status": marital_sel,
+            "education": edu_sel,
+            "principal_activity": act_sel,
+            "day_of_week": dow_sel,
+            "sector": sector_sel,
+            "caregiving_required": caregiving_sel,
+            "state_id": state_id,
+            "state_name": state_options[state_id],
+            "district_id": district_id,
+            "district_name": district_options[district_id],
+            "gumbel_temperature": gumbel_temp,
+            "gumbel_hard": gumbel_hard,
+        }
+        record.update({TIME_SLOTS[i]: int(decoded[i]) for i in range(48)})
+        all_records.append(record)
+
+    # --- Export generated diaries ---
+    st.subheader("⬇️ Export Generated Diaries")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    col_csv, col_json = st.columns(2)
+    with col_csv:
+        st.download_button(
+            "Download CSV",
+            data=diaries_to_csv_bytes(all_records),
+            file_name=f"tusgan_diaries_{timestamp}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with col_json:
+        st.download_button(
+            "Download JSON",
+            data=diaries_to_json_bytes(all_records),
+            file_name=f"tusgan_diaries_{timestamp}.json",
+            mime="application/json",
+            use_container_width=True,
+        )
 
 
 def page_evaluation(eval_dir: str, version_label: str):

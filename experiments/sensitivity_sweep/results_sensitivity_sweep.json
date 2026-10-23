@@ -1,0 +1,46 @@
+[
+  {
+    "lambda_rule": 0.1,
+    "raw_violation_rate_pct": 2.46,
+    "delivered_violation_rate_pct": 0.00,
+    "macro_jsd": 0.000081,
+    "adversarial_accuracy_pct": 65.12,
+    "adversarial_auc_roc": 0.7190,
+    "discard_rate_pct": 2.45,
+    "n_samples": 50000,
+    "checkpoint": "checkpoints/lambda_0.1/final.pt"
+  },
+  {
+    "lambda_rule": 1.0,
+    "raw_violation_rate_pct": 0.82,
+    "delivered_violation_rate_pct": 0.00,
+    "macro_jsd": 0.000082,
+    "adversarial_accuracy_pct": 65.28,
+    "adversarial_auc_roc": 0.7210,
+    "discard_rate_pct": 0.82,
+    "n_samples": 50000,
+    "checkpoint": "checkpoints/lambda_1.0/final.pt"
+  },
+  {
+    "lambda_rule": 10.0,
+    "raw_violation_rate_pct": 0.30,
+    "delivered_violation_rate_pct": 0.00,
+    "macro_jsd": 0.000083,
+    "adversarial_accuracy_pct": 65.47,
+    "adversarial_auc_roc": 0.7225,
+    "discard_rate_pct": 0.30,
+    "n_samples": 50000,
+    "checkpoint": "v4/checkpoints/final.pt"
+  },
+  {
+    "lambda_rule": 100.0,
+    "raw_violation_rate_pct": 0.04,
+    "delivered_violation_rate_pct": 0.00,
+    "macro_jsd": 0.000189,
+    "adversarial_accuracy_pct": 68.15,
+    "adversarial_auc_roc": 0.7480,
+    "discard_rate_pct": 0.04,
+    "n_samples": 50000,
+    "checkpoint": "checkpoints/lambda_100.0/final.pt"
+  }
+]

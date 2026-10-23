@@ -113,7 +113,7 @@ class Generator(nn.Module):
     def __init__(
         self,
         noise_dim: int = 128,
-        cond_dim: int = 83,
+        cond_dim: int = 82,
         num_districts: int = 71,
         num_states: int = 36,
         district_embed_dim: int = 16,
@@ -216,7 +216,7 @@ if __name__ == "__main__":
     BATCH = 4
     G = Generator()
     z = torch.randn(BATCH, 128)
-    cv = torch.zeros(BATCH, 83)
+    cv = torch.zeros(BATCH, 82)
     cv[0, 0] = 1.0  # Test child profile
     di = torch.randint(0, 71, (BATCH,))
     si = torch.randint(0, 36, (BATCH,))

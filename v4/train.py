@@ -26,6 +26,46 @@ from critic import Critic, compute_gradient_penalty, critic_loss, generator_loss
 # ─────────────────────────────────────────────────────────────
 
 
+def resolve_split_indices(split: str = "train", split_indices_path: str = None, npz_path: str = None):
+    """
+    Resolves and loads the 90/10 train/test partition indices.
+    """
+    if split is None or str(split).lower() == "all":
+        return None
+
+    if split_indices_path and os.path.exists(split_indices_path):
+        indices = np.load(split_indices_path)
+        print(f"📁 Loaded explicit split indices from {split_indices_path} ({len(indices):,} records)")
+        return indices
+
+    fname = f"{str(split).lower()}_indices.npy"
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+
+    candidates = [
+        fname,
+        os.path.join(script_dir, fname),
+        os.path.join(script_dir, "..", "data", fname),
+        os.path.join("data", fname),
+        os.path.join("..", "data", fname),
+    ]
+    if npz_path:
+        npz_dir = os.path.dirname(os.path.abspath(npz_path))
+        candidates.extend([
+            os.path.join(npz_dir, fname),
+            os.path.join(npz_dir, "..", "data", fname),
+            os.path.join(npz_dir, "data", fname),
+        ])
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            indices = np.load(cand)
+            print(f"📁 Loaded split '{split}' from {cand} ({len(indices):,} records)")
+            return indices
+
+    print(f"⚠️ Warning: Split indices for '{split}' not found in candidates. Using full dataset.")
+    return None
+
+
 class TUSDataset(Dataset):
     """
     Loads the pre-encoded 9-channel ITUS data with state and district.
@@ -37,18 +77,46 @@ class TUSDataset(Dataset):
         state_id      : ()           int64    state index
     """
 
-    def __init__(self, npz_path: str, subset_size: int = None, device=None):
+    def __init__(
+        self,
+        npz_path: str,
+        subset_size: int = None,
+        device=None,
+        split: str = "train",
+        split_indices: str = None,
+    ):
         if not os.path.exists(npz_path):
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            npz_path = os.path.join(script_dir, os.path.basename(npz_path))
+            candidates = [
+                os.path.join(script_dir, os.path.basename(npz_path)),
+                os.path.join(script_dir, "tusgan_encode.npz"),
+                os.path.join(script_dir, "..", "data", "tusgan_encode.npz"),
+                "data/tusgan_encode.npz",
+                "tusgan_encode.npz",
+            ]
+            for cand in candidates:
+                if os.path.exists(cand):
+                    npz_path = cand
+                    break
 
         data = np.load(npz_path)
 
         # Load arrays
         diary = torch.from_numpy(data["diary_tensor"]).float()  # (N, 9, 48, 1)
-        cond = torch.from_numpy(data["cond_vector"]).float()  # (N, 83)
+        cond = torch.from_numpy(data["cond_vector"]).float()  # (N, 82)
         district_ids = torch.from_numpy(data["district_ids"]).long()  # (N,)
         state_ids = torch.from_numpy(data["state_ids"]).long()  # (N,)
+
+        # Filter by train/test partition (default: 'train', 400,741 records)
+        split_idx = resolve_split_indices(split=split, split_indices_path=split_indices, npz_path=npz_path)
+        if split_idx is not None:
+            diary = diary[split_idx]
+            cond = cond[split_idx]
+            district_ids = district_ids[split_idx]
+            state_ids = state_ids[split_idx]
+            split_info = f" (split='{split}', {len(diary):,} records)"
+        else:
+            split_info = " (full dataset)"
 
         if subset_size is not None and subset_size > 0:
             diary = diary[:subset_size]
@@ -73,7 +141,7 @@ class TUSDataset(Dataset):
             self.district_ids = self.district_ids.to(device)
             self.state_ids = self.state_ids.to(device)
 
-        print(f"✅ Dataset loaded: {len(self.diary):,} diaries")
+        print(f"✅ Dataset loaded: {len(self.diary):,} diaries{split_info}")
         print(f"   Diary shape: {self.diary.shape} (9-channel representation)")
         print(f"   Cond dim: {self.cond_dim}")
         print(f"   Num districts: {self.num_districts}")
@@ -95,6 +163,8 @@ def get_config():
     return dict(
         # ── Data ────────────────────────────────────────────────
         data_path="2019/img-encode/tusgan_encode.npz",
+        split="train",
+        split_indices=None,
         num_workers=2,
         subset=None,
         # ── Model Architecture ───────────────────────────────────
@@ -314,7 +384,12 @@ def train(cfg):
         data_path = os.path.join("wgan-gp", data_path)
         print(f"Resolving dataset path to: {data_path}")
 
-    dataset = TUSDataset(data_path, subset_size=cfg.get("subset"))
+    dataset = TUSDataset(
+        data_path,
+        subset_size=cfg.get("subset"),
+        split=cfg.get("split", "train"),
+        split_indices=cfg.get("split_indices", None),
+    )
 
     # Update config with actual dataset dimensions so checkpoints
     # save the correct values (defaults may differ from real data).
@@ -688,10 +763,25 @@ def parse_args():
     # v4 hyperparameters parser arguments
     parser.add_argument("--lambda_cond", type=float, default=cfg["lambda_cond"])
     parser.add_argument("--lambda_logic", type=float, default=cfg["lambda_logic"])
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="train",
+        choices=["train", "test", "all"],
+        help="Dataset split: 'train' (90%%, 400,741 records), 'test' (10%%, 44,527 records), or 'all'",
+    )
+    parser.add_argument(
+        "--split_indices",
+        type=str,
+        default=None,
+        help="Explicit path to split indices .npy file",
+    )
 
     args = parser.parse_args()
 
     cfg["data_path"] = args.data
+    cfg["split"] = args.split
+    cfg["split_indices"] = args.split_indices
     cfg["epochs"] = args.epochs
     cfg["batch_size"] = args.batch
     cfg["noise_dim"] = args.noise_dim

@@ -19,17 +19,30 @@ dist/
 *.pth
 *.zip
 *.npz
+*.npy
 slide_images/
 *.ckpt
 epoch_*.pt
 checkpoints_seed*/
+v4.1/checkpoints/*.pt
+v5.1/checkpoints/*.pt
+experiments/diagnostics/gradient_analysis/results/*.pt
 
 # Logs and outputs
 runs/
 samples/
 *.tfevents*
 caveat_bench/outputs/actvae_logs/
+caveat_bench/outputs/acteval_breakdown/
+caveat_bench/data/*.csv
+experiments/sensitivity_sweep/test_outputs/
 .ipynb_checkpoints/
+
+# External references & local scratch reports
+references/
+TUS-GAN_Technical_Analysis_Report.pdf
+experiments/diagnostics/apply_*.py
+experiments/diagnostics/audit_*.py
 
 # presentations
 *.html

@@ -19,7 +19,7 @@ The v2 architecture establishes the fundamental multi-channel conditional WGAN-G
 ```mermaid
 graph TD
     Z["Latent Noise Vector (128-dim)"] --> Gen["Generator (CNN + Self-Attention + CBN)"]
-    C["Demographics (83-dim) + State/District Embeddings"] --> Gen
+    C["Demographics (82-dim) + State/District Embeddings"] --> Gen
     Gen --> T["Tanh Activation Layer"]
     T --> SD["Synthetic Diary Tensor (9x48 Soft Probabilities)"]
     

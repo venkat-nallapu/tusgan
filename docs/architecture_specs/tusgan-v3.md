@@ -18,7 +18,7 @@ The v3 architecture establishes the core adversarial framework, introducing Gumb
 ```mermaid
 graph TD
     Z["Latent Noise Vector (128-dim)"] --> Gen["Generator (CNN + Self-Attention)"]
-    C["Demographic Conditions (83-dim)"] --> Gen
+    C["Demographic Conditions (82-dim)"] --> Gen
     Gen --> L["Raw Activity Logits"]
     L --> GS["Gumbel-Softmax Layer"]
     GS --> SD["Synthetic Diary (9x48 One-Hot)"]

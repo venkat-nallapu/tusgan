@@ -2,7 +2,7 @@
 
 ## 🛑 Setbacks in Previous Version (v4)
 - **Fragmented Spell Durations:** The model still struggled with generating long, continuous blocks of structured activities (e.g., producing unbroken 8-hour work shifts). While the v4 transition matrices fixed the *order* of events, they failed to regulate the *length* of an event once it started.
-- **Subtle Conditioning Leaks:** The AC-GAN classifier in v4 was a step forward, but proved too weak to map the extreme high-dimensional complexity of 83 demographic variables. An adversarial classifier could still separate real from synthetic data with an AUC of 0.72.
+- **Subtle Conditioning Leaks:** The AC-GAN classifier in v4 was a step forward, but proved too weak to map the extreme high-dimensional complexity of 82 demographic variables. An adversarial classifier could still separate real from synthetic data with an AUC of 0.72.
 - **Soft Penalties vs Hard Constraints:** The v4 Neuro-Symbolic logic acted as a soft penalty. Because neural networks optimize for total loss, the model mathematically chose to "take the penalty" 0.30% of the time, failing to guarantee a strict 0.00% physical violation rate.
 
 ## 🚀 What's New in this Version [Proposed Features & Add-ons]

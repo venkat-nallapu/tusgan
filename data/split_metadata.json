@@ -1,0 +1,60 @@
+{
+  "timestamp_utc": "2026-10-12T12:33:56.617652Z",
+  "dataset_source": "data/tusgan_encode.npz",
+  "random_seed": 42,
+  "total_records": 445268,
+  "train_records": 400741,
+  "test_records": 44527,
+  "train_fraction": 0.8999995508323078,
+  "test_fraction": 0.10000044916769227,
+  "stratification_method": "joint (state_id, district_id, is_child) with singleton preservation",
+  "spatial_coverage": {
+    "total_states": 36,
+    "train_states": 36,
+    "test_states": 36,
+    "total_districts": 676,
+    "train_districts": 676,
+    "test_districts": 676
+  },
+  "demographic_parity": {
+    "child_under_15": {
+      "real_pct": 14.162032753308122,
+      "train_pct": 14.167754235279146,
+      "test_pct": 14.110539672558224,
+      "train_test_delta": 0.0572145627209224
+    },
+    "gender": {
+      "Male": {
+        "real_pct": 50.89698788145566,
+        "train_pct": 50.921667610751086,
+        "test_pct": 50.674871426325595
+      },
+      "Female": {
+        "real_pct": 49.074040802393164,
+        "train_pct": 49.04938601241201,
+        "test_pct": 49.29593280481506
+      },
+      "Transgender": {
+        "real_pct": 0.02897131615117188,
+        "train_pct": 0.028946376836909628,
+        "test_pct": 0.029195768859343767
+      }
+    },
+    "sector": {
+      "Rural": {
+        "real_pct": 38.89163380256385,
+        "train_pct": 38.902932317881124,
+        "test_pct": 38.789947672198885
+      },
+      "Urban": {
+        "real_pct": 80.68197130716783,
+        "train_pct": 80.66656518798925,
+        "test_pct": 80.82062568778494
+      }
+    }
+  },
+  "artifacts": {
+    "train_indices_file": "data/train_indices.npy",
+    "test_indices_file": "data/test_indices.npy"
+  }
+}

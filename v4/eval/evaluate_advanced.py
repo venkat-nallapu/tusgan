@@ -77,23 +77,87 @@ def load_generator(checkpoint_path: str, device: torch.device):
     return G, noise_dim
 
 
-def load_real_data(data_path: str):
-    """Load the pre-encoded NPZ dataset."""
+def resolve_split_indices(split: str = "test", split_indices_path: str = None, npz_path: str = None):
+    """
+    Resolves and loads the 90/10 train/test partition indices.
+    """
+    if split is None or str(split).lower() == "all":
+        return None
+
+    if split_indices_path and os.path.exists(split_indices_path):
+        indices = np.load(split_indices_path)
+        print(f"📁 Loaded explicit split indices from {split_indices_path} ({len(indices):,} records)")
+        return indices
+
+    fname = f"{str(split).lower()}_indices.npy"
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+
+    candidates = [
+        fname,
+        os.path.join(script_dir, fname),
+        os.path.join(script_dir, "..", fname),
+        os.path.join(script_dir, "..", "..", "data", fname),
+        os.path.join("data", fname),
+        os.path.join("..", "data", fname),
+    ]
+    if npz_path:
+        npz_dir = os.path.dirname(os.path.abspath(npz_path))
+        candidates.extend([
+            os.path.join(npz_dir, fname),
+            os.path.join(npz_dir, "..", "data", fname),
+            os.path.join(npz_dir, "data", fname),
+        ])
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            indices = np.load(cand)
+            print(f"📁 Loaded split '{split}' from {cand} ({len(indices):,} records)")
+            return indices
+
+    print(f"⚠️ Warning: Split indices for '{split}' not found in candidates. Using full dataset.")
+    return None
+
+
+def load_real_data(data_path: str, split: str = "test", split_indices: str = None):
+    """Load the pre-encoded NPZ dataset with train/test partition support."""
     if not os.path.exists(data_path):
-        alt = os.path.join("wgan-gp", data_path)
-        if os.path.exists(alt):
-            data_path = alt
-        else:
-            raise FileNotFoundError(f"Dataset NPZ not found at: {data_path}")
+        script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "."
+        candidates = [
+            os.path.join(script_dir, data_path),
+            os.path.join(script_dir, os.path.basename(data_path)),
+            os.path.join(script_dir, "..", "tusgan_encode.npz"),
+            os.path.join(script_dir, "..", "..", "data", "tusgan_encode.npz"),
+            "data/tusgan_encode.npz",
+            "v4/tusgan_encode.npz",
+            "tusgan_encode.npz",
+            os.path.join("wgan-gp", data_path),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                data_path = c
+                break
+
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Dataset NPZ not found at: {data_path}")
 
     data = np.load(data_path)
-    print(f"✅ Loaded real data from {data_path} ({data['diary_tensor'].shape[0]:,} records)")
-    return (
-        data["diary_tensor"],  # (N, 9, 48, 1)
-        data["cond_vector"],  # (N, 83)
-        data["district_ids"],  # (N,)
-        data["state_ids"],  # (N,)
-    )
+    diaries = data["diary_tensor"]
+    cond = data["cond_vector"]
+    dists = data["district_ids"]
+    states = data["state_ids"]
+
+    split_idx = resolve_split_indices(split=split, split_indices_path=split_indices, npz_path=data_path)
+    if split_idx is not None:
+        diaries = diaries[split_idx]
+        cond = cond[split_idx]
+        dists = dists[split_idx]
+        states = states[split_idx]
+        split_info = f" (split='{split}', {len(diaries):,} records)"
+    else:
+        split_info = " (full dataset)"
+
+    print(f"✅ Loaded real data from {data_path}: {diaries.shape[0]:,} records{split_info}")
+    return diaries, cond, dists, states
 
 
 @torch.no_grad()
@@ -385,41 +449,66 @@ if __name__ == "__main__":
         default="evaluation_results",
         help="Directory to save evaluation charts",
     )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="test",
+        choices=["train", "test", "all"],
+        help="Dataset partition to evaluate on: 'test' (10%%, 44,527 records), 'train', or 'all'",
+    )
+    parser.add_argument(
+        "--split_indices",
+        type=str,
+        default=None,
+        help="Explicit path to split indices .npy file",
+    )
 
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\n🖥️ Device: {device}")
 
-    # 1. Load resources
-    real_diary_tensor, real_cond, real_dists, real_states = load_real_data(args.data)
+    # 1. Load resources (Held-out Test split by default)
+    real_diary_tensor, real_cond, real_dists, real_states = load_real_data(
+        args.data, split=args.split, split_indices=args.split_indices
+    )
     G, noise_dim = load_generator(args.checkpoint, device)
 
     # Match evaluation sample size
     eval_n = min(args.n_samples, real_diary_tensor.shape[0])
+    N_avail = real_diary_tensor.shape[0]
+
+    # Uniform subsampling across the held-out test cohort to preserve Pan-India representation
+    if eval_n < N_avail:
+        sample_idx = np.random.choice(N_avail, size=eval_n, replace=False)
+        real_diary_sub = real_diary_tensor[sample_idx]
+        real_cond_sub = real_cond[sample_idx]
+        real_dists_sub = real_dists[sample_idx]
+        real_states_sub = real_states[sample_idx]
+    else:
+        real_diary_sub = real_diary_tensor
+        real_cond_sub = real_cond
+        real_dists_sub = real_dists
+        real_states_sub = real_states
 
     # 2. Generate matches
     fake_diary_tensor, fake_cond, _, _ = generate_synthetic(
-        G, real_cond, real_dists, real_states, noise_dim, eval_n, device
+        G, real_cond_sub, real_dists_sub, real_states_sub, noise_dim, eval_n, device
     )
 
-    # Slice real data down to match sample size exactly
-    real_diary_tensor = real_diary_tensor[:eval_n]
-    real_cond = real_cond[:eval_n]
-
     # Decode to integer sequences for spell analysis
-    real_codes = decode_to_codes(real_diary_tensor)
+    real_codes = decode_to_codes(real_diary_sub)
     fake_codes = decode_to_codes(fake_diary_tensor)
 
     # Run spell evaluation
     evaluate_spells(real_codes, fake_codes, args.output_dir)
 
     # Run logical constraints evaluation
-    evaluate_logical_constraints(real_codes, fake_codes, real_cond, fake_cond)
+    evaluate_logical_constraints(real_codes, fake_codes, real_cond_sub, fake_cond)
 
     # Run classifier validation
     train_adversarial_validation(
-        real_diary_tensor, fake_diary_tensor, real_cond, fake_cond, args.output_dir
+        real_diary_sub, fake_diary_tensor, real_cond_sub, fake_cond, args.output_dir
     )
 
     print("\n\u2728 Advanced evaluation complete!\n")

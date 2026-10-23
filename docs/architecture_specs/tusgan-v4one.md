@@ -23,7 +23,7 @@ The v4.1 architecture integrates deterministic logit clamping into the convoluti
 ### System Mapping & Data Flow
 ```mermaid
 graph TD
-    Z["Latent Noise (128-dim)"] & C["Demographics (83-dim)"] --> Gen["Generator (CNN + Self-Attention)"]
+    Z["Latent Noise (128-dim)"] & C["Demographics (82-dim)"] --> Gen["Generator (CNN + Self-Attention)"]
     Gen --> L["Raw Pre-activation Logits (9x48)"]
     
     C -.->|Age < 15 Filter| DM["Deterministic Masking (-1e9)"]

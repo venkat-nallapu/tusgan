@@ -112,7 +112,7 @@ class DownsampleBlock(nn.Module):
 class Critic(nn.Module):
     def __init__(
         self,
-        cond_dim: int = 83,
+        cond_dim: int = 82,
         num_districts: int = 71,
         num_states: int = 36,
         district_embed_dim: int = 16,

@@ -168,6 +168,8 @@ tusgan/
 ├── publish/                           # Master publication repository (gitignored submission artifacts)
 │   ├── README.md                      #   Directory organization & fast-fetch table
 │   ├── manuscript/                    #   Working manuscript drafts (TUS_GAN_V2.docx / .pdf)
+│   │   └── sections/                  #   Modular section docxs (01_abstract.docx, ..., results/ subsections)
+│   │       └── results/               #     Fine-grained results subsections (6.1_softvshard.docx, etc.)
 │   ├── figures/                       #   Publication figures (Fig 8, Fig 9, Privacy Audit, Architecture)
 │   ├── reports/                       #   Academic reports (CAVEAT_BENCHMARK_REPORT.md, PRIVACY_AUDIT_REPORT.md)
 │   ├── roadmaps_and_guides/           #   Execution roadmaps, Caveat explainers, and integration guides
@@ -193,13 +195,13 @@ tusgan/
 | Key | Shape | Dtype | Range | Description |
 |:----|:------|:------|:------|:------------|
 | `diary_tensor` | `(N, 9, 48, 1)` | float32 | `{-1.0, 1.0}` | One-hot activity indicator scaled to WGAN range. 9 ICATUS divisions × 48 half-hour slots. |
-| `cond_vector` | `(N, 83)` | float32 | `{0.0, 1.0}` | Concatenated one-hot demographic features. |
+| `cond_vector` | `(N, 82)` | float32 | `{0.0, 1.0}` | Concatenated one-hot demographic features. |
 | `state_ids` | `(N,)` | int64 | `0–35` | 36 States/UTs (zero-indexed). |
-| `district_ids` | `(N,)` | int64 | `0–70` | 71 districts (zero-indexed). |
+| `district_ids` | `(N,)` | int64 | `0–70` | 71 intra-state district codes (zero-indexed, max count from Uttar Pradesh; uniquely indexes 676 surveyed districts when combined with `state_ids`). |
 | `num_states` | scalar | int | 36 | Total unique state embeddings. |
-| `num_districts` | scalar | int | 71 | Total unique district embeddings. |
+| `num_districts` | scalar | int | 71 | Maximum intra-state district embedding cardinality. |
 
-### 83-Dimensional Conditioning Vector Layout
+### 82-Dimensional Conditioning Vector Layout
 
 | Indices | Feature | Categories |
 |:--------|:--------|:-----------|
@@ -211,7 +213,11 @@ tusgan/
 | `39:46` | Day of Week | Monday–Sunday |
 | `46:48` | Sector | Rural, Urban |
 | `48:58` | Household Size | Binned categories |
-| `58:83` | MPCE & Survey Indicators | Quintiles and auxiliary fields |
+| `58:82` | MPCE & Survey Indicators | Quintiles and auxiliary fields |
+
+> Note: indices `0:58` are the labeled demographic categories above (verified: their category counts sum to 58). The raw ITUS→NPZ encoding script is not shipped in this repository, so the exact sub-composition of the remaining `58:82` catch-all bucket (24 dims, previously misdocumented as 25/`58:83`) cannot be independently re-derived from source — only its total width, which is confirmed from `tusgan_encode.npz`'s actual `cond_vector` shape of `(N, 82)`.
+>
+> **Spatial Embedding Architecture**: India comprises 683 official districts in MoSPI records (with 676 surveyed districts in `tusgan_encode.npz`). In MoSPI survey microdata, district codes are local intra-state numbers (`01` to $K_s$, where Uttar Pradesh has the maximum count of 71). The model uses a two-level hierarchical spatial conditioning scheme: an 8-dimensional state embedding (`nn.Embedding(36, 8)`) and a 16-dimensional intra-state district embedding (`nn.Embedding(71, 16)`). The combined tuple `(state_id, district_id)` uniquely identifies all 676 surveyed districts while maintaining high parameter efficiency.
 
 ### 9 ICATUS Activity Divisions
 
@@ -249,21 +255,21 @@ tusgan/
 ```
 Inputs:
   z ∈ ℝ^(B×128)          — Latent noise
-  cond ∈ ℝ^(B×83)         — One-hot demographics
+  cond ∈ ℝ^(B×82)         — One-hot demographics
   district_ids ∈ {0..70}  — District embedding lookup
   state_ids ∈ {0..35}     — State embedding lookup
 
 Embeddings:
   d_emb = Embedding(71, 16)(district_ids)   → ℝ^(B×16)
   s_emb = Embedding(36, 8)(state_ids)       → ℝ^(B×8)
-  c = cat([cond, d_emb, s_emb], dim=1)      → ℝ^(B×107)  ← full_cond_dim
+  c = cat([cond, d_emb, s_emb], dim=1)      → ℝ^(B×106)  ← full_cond_dim
 
 Dense Projection:
-  fc = Linear(128+107=235, 256×12×1=3072) + LeakyReLU(0.2)
+  fc = Linear(128+106=234, 256×12×1=3072) + LeakyReLU(0.2)
   Reshape → (B, 256, 12, 1)
 
 Upsample Stage 1:
-  up1 = UpsampleBlock(256→128, cond_dim=107) → (B, 128, 24, 1)
+  up1 = UpsampleBlock(256→128, cond_dim=106) → (B, 128, 24, 1)
 
 Temporal Attention:
   v3/v4/v4.1: SelfAttention2d(128)
@@ -271,7 +277,7 @@ Temporal Attention:
   v6:         TemporalTransformerBlock(128, num_layers=6, nhead=8, PE=sinusoidal)
 
 Upsample Stage 2:
-  up2 = UpsampleBlock(128→64, cond_dim=107) → (B, 64, 48, 1)
+  up2 = UpsampleBlock(128→64, cond_dim=106) → (B, 64, 48, 1)
 
 Output:
   out_conv = Conv2d(64, 9, kernel_size=(3,1), padding=(1,0)) → logits (B, 9, 48, 1)
@@ -283,20 +289,20 @@ Output:
 
 ```
 Inputs:
-  diary (B, 9, 48, 1)  +  c ∈ ℝ^(B×107)
+  diary (B, 9, 48, 1)  +  c ∈ ℝ^(B×106)
 
 Spatial Conditioning:
-  c_spatial = c.view(B, 107, 1, 1).expand(B, 107, 48, 1)
-  x = cat([diary, c_spatial], dim=1) → (B, 116, 48, 1)
+  c_spatial = c.view(B, 106, 1, 1).expand(B, 106, 48, 1)
+  x = cat([diary, c_spatial], dim=1) → (B, 115, 48, 1)
 
-down1: DownsampleBlock(116→64, cond=107)   → (B, 64, 24, 1)
-down2: DownsampleBlock(64→128, cond=107)    → (B, 128, 12, 1)
+down1: DownsampleBlock(115→64, cond=106)   → (B, 64, 24, 1)
+down2: DownsampleBlock(64→128, cond=106)    → (B, 128, 12, 1)
 
 Temporal Attention:
   v3/v4/v4.1: SelfAttention2d(128)
   v5/v5.1/v6: TemporalTransformerBlock(128, num_layers=2, nhead=4)
 
-down3: DownsampleBlock(128→256, cond=107)   → (B, 256, 6, 1)
+down3: DownsampleBlock(128→256, cond=106)   → (B, 256, 6, 1)
 
 Score Output:
   Flatten → (B, 1536) → SN-Linear(1536, 1) → scalar Wasserstein score
@@ -304,7 +310,7 @@ Score Output:
 InfoNCE Projections (v5/v5.1/v6 only):
   AdaptiveAvgPool1d(1) → (B, 256)
   feat_proj: Linear(256, 128) → LeakyReLU → Linear(128, 64) → L2-normalize
-  cond_proj: Linear(107, 128) → LeakyReLU → Linear(128, 64) → L2-normalize
+  cond_proj: Linear(106, 128) → LeakyReLU → Linear(128, 64) → L2-normalize
 ```
 
 ### DemographicClassifier (v4/v4.1 AC-GAN)
@@ -314,7 +320,7 @@ Input: diary (B, 9, 48, 1)
 conv1: Conv2d(9, 32, (4,1), stride=(2,1), pad=(1,0)) + LeakyReLU(0.2) → (B, 32, 24, 1)
 conv2: Conv2d(32, 64, (4,1), stride=(2,1), pad=(1,0)) + LeakyReLU(0.2) → (B, 64, 12, 1)
 Flatten → (B, 768)
-fc: Linear(768, 83)
+fc: Linear(768, 82)
 Criterion: BCEWithLogitsLoss
 ```
 
@@ -334,22 +340,32 @@ Criterion: BCEWithLogitsLoss
 | **v5.1** (Cell D) | Transformer | Gradient restoration proof | Soft Penalty (λ=10) | 0.004534 | 0.7545 | 0.01% raw |
 | **v6** | Transformer (6L, 8H) | Deep Conformer + Sinusoidal PE | Hybrid (soft train + hard inference) | Under dev | — | — |
 
-### The Dead-Gradient Problem (Central Thesis)
+### The Dead-Gradient Problem (Central Thesis & Scope)
 
-Hard logit masking (`logits[:, 0, :, :] = -1e9`) forces softmax output to identically zero,
-making `∂S_k/∂z_k = S_k(1 - S_k) = 0 × 1 = 0`. The backward pass is completely severed.
+Hard logit masking (`logits[:, 0, :, :] = -1e9`) forces softmax probability on Channel 0 (Employment) to identically zero:
+`S(z̃_0) = exp(-10⁹) / Σ exp(z_j) ≡ 0.0`.
 
-**Formal derivation**: When deterministic logit masking sets z̃_k = -10⁹:
+**1. Gradient Severance on Channel 0 Projection Weights ($W_0$):**
+The softmax Jacobian entries for Channel 0 vanish identically:
+- $\partial S_0 / \partial \tilde{z}_0 = S_0 (1 - S_0) = 0 \times 1 = 0$
+- $\partial S_i / \partial \tilde{z}_0 = -S_i S_0 = -S_i \times 0 = 0$ for all $i \neq 0$
+- Furthermore, because $\tilde{z}_0$ is clamped to a literal constant, $\partial \tilde{z}_0 / \partial z_0 \equiv 0$.
 
-```
-S(z̃_k) = exp(-10⁹) / Σ exp(z_j) ≡ 0.0
-∂S_i/∂z_j = S_i(δ_ij - S_j)
-For k: ∂S_k/∂z_k = S_k(1 - S_k) = 0 × 1 = 0
-Chain rule: ∇_θ L = (∂L/∂S_k) · 0 · (∂z_k/∂θ) ≡ 0
-```
+Consequently, the gradient with respect to Channel 0's dedicated output projection weights ($W_0$) is identically zero:
+$$\frac{\partial \mathcal{L}}{\partial W_0} = \sum_{t=1}^{48} \sum_{i=0}^8 \frac{\partial \mathcal{L}}{\partial S_{i,t}} \frac{\partial S_{i,t}}{\partial \tilde{z}_{0,t}} \frac{\partial \tilde{z}_{0,t}}{\partial z_{0,t}} \frac{\partial z_{0,t}}{\partial W_0} \equiv \mathbf{0}$$
+Channel 0 output neurons receive zero backpropagated learning signal and are effectively frozen during constrained child batches.
 
-**Key finding**: This is architecture-agnostic — it affects CNNs (Cell C) identically to
-Transformers (Cell B). Soft penalties restore healthy gradient flow in both backbones.
+**2. Gradient Flow into Preceding (Upstream) Layers:**
+Crucially, the generator loss $\mathcal{L}$ is multivariate across all 9 ICATUS channels. Upstream network parameters $\theta_{\text{upstream}}$ (convolutional upsamplers, normalization layers, self-attention / transformer blocks) **continue to receive learning signals through the 8 unconstrained channels ($j \in \{1, \dots, 8\}$)**:
+$$\nabla_{\theta_{\text{upstream}}} \mathcal{L} = \underbrace{\frac{\partial \mathcal{L}}{\partial z_0} \frac{\partial z_0}{\partial \theta}}_{\equiv 0} + \sum_{j=1}^8 \frac{\partial \mathcal{L}}{\partial z_j} \frac{\partial z_j}{\partial \theta} \neq \mathbf{0}$$
+Preceding layers do NOT suffer total gradient extinction; rather, they suffer **gradient distortion and projection asymmetry**: because Channel 0 cannot adjust its own weights $W_0$ to depress work logits, the optimizer forces upstream hidden representations to warp solely to satisfy Critic and Transition objectives across channels 1–8.
+
+**3. Disclosure on Soft Penalty Gradients under 100% Compliance:**
+Under soft neuro-symbolic penalization ($\mathcal{L}_{\text{logic}} = \lambda \sum_{t} S_{0,t}$ for children):
+$$\nabla_\theta \mathcal{L}_{\text{logic}} = \lambda \sum_{t=1}^{48} S_{0,t}(1 - S_{0,t}) \frac{\partial z_{0,t}}{\partial \theta}$$
+Whenever the model approaches 100% compliance ($S_{0,t} \to 0$ for all child slots), the gradient of the penalty loss also vanishes naturally:
+$$\lim_{S_{0,t} \to 0} \nabla_\theta \mathcal{L}_{\text{logic}} = \lambda \sum_{t} 0 \times (1 - 0) \frac{\partial z_{0,t}}{\partial \theta} \equiv \mathbf{0}$$
+This represents standard Karush-Kuhn-Tucker (KKT) complementary slackness: once violations reach zero, corrective penalty gradients naturally cease. The fundamental distinction is that hard masking zeroes $W_0$ gradients *unconditionally and a priori* from step 1 (preventing boundary learning), whereas soft penalization provides strong, active gradients during violations and smoothly recedes only upon empirical compliance.
 
 ### 2×2 Factorial Matrix (Manuscript Table 6)
 
@@ -502,7 +518,7 @@ When running or interpreting evaluations, these are the core metrics:
 1. **Jensen-Shannon Divergence (JSD)**: Macro-population activity distribution match. Target: `< 0.00010`. Computed via `scipy.spatial.distance.jensenshannon(p, q) ** 2`.
 2. **Transition Matrix Frobenius Norm**: Temporal sequence transition fidelity. `np.linalg.norm(P_fake - P_real, ord='fro')` on a 9×9 row-stochastic matrix.
 3. **Spell-Duration Earth Mover's Distance (EMD/Wasserstein-1)**: Continuity and realism of contiguous activity blocks. Per-activity `scipy.stats.wasserstein_distance(real_spells, fake_spells)`.
-4. **Adversarial Validation (RF AUC-ROC)**: Random Forest (100 trees, max_depth=12) trained on `(432 diary slots + 83 demographics)` to distinguish real from synthetic. Ideal: AUC = 0.500.
+4. **Adversarial Validation (RF AUC-ROC)**: Random Forest (100 trees, max_depth=12) trained on `(432 diary slots + 82 demographics)` to distinguish real from synthetic. Ideal: AUC = 0.500.
 5. **Logical Constraint Violation Rate**: Percentage of children (`cond_vec[:, 0] == 1`) with any Employment activity (code 1). Real ITUS baseline: 3.87%. Production target: 0.00%.
 
 ### Benchmark Results
@@ -784,8 +800,16 @@ When generating or modifying publication figures, strictly follow these rules:
 - `tusgan_encode.npz` (dataset) — any copy in `data/`, `v3/`, `v4/`
 - `uv.lock` (dependency lock — regenerate via `uv lock` only)
 - Any file under `caveat/` (external benchmark clone)
-- Files under `publish/` (manuscript and submission artifacts)
+- Master manuscript files (`publish/manuscript/TUS_GAN_V2.docx`, `publish/manuscript/TUS_GAN_V2.pdf`) — see Hard Rule below
 - `DEVELOPMENT_LEDGER.md` — append-only log (do not rewrite existing entries)
+
+### Manuscript Editing Rules (HARD RULE: Section-Level Scoping Only)
+
+> [!CAUTION]
+> **HARD RULE FOR AI ASSISTANT**: When improving, revising, polishing, or expanding manuscript content, Antigravity **MUST ONLY** modify the individual section documents in [`publish/manuscript/sections/`](file:///home/venkat/projects/tusgan/publish/manuscript/sections/) (e.g., `01_abstract.docx`, `02_introduction.docx`, `05_methodology.docx`, `07_results.docx` or its fine-grained subsections in [`results/`](file:///home/venkat/projects/tusgan/publish/manuscript/sections/results/), `08_discussion.docx`, etc.).
+> - **Never touch the master copy**: Do NOT directly edit, overwrite, or mutate `publish/manuscript/TUS_GAN_V2.docx` during iterative section refinement.
+> - **Compilation target only**: The master file `TUS_GAN_V2.docx` serves as a frozen compilation target and may only be recompiled or replaced when the user explicitly requests a full document rebuild.
+> - **Strict section boundaries**: Changes requested for a specific section must remain confined solely to that section's numbered `.docx` file (or corresponding subsection docx in `results/`).
 
 ### Files that are gitignored (do not track)
 
@@ -900,7 +924,7 @@ The following experiments are tracked in [`publish/roadmaps_and_guides/TUS_GAN_E
    - $C_2$: Minimum sleep/self-care hinge loss
    - $C_3$: Compulsory schooling (RTE Act 2009) → Table 7
 3. **Section 6.7**: Caveat & ActVAE benchmarking → Table 8 and Figure 9 **[COMPLETED ✅]**
-4. **Section 6.8**: $\lambda_{\text{rule}}$ sensitivity sweep across $\{0.1, 1.0, 10.0, 100.0\}$ → Figure 10
+4. **Section 6.8**: $\lambda_{\text{rule}}$ sensitivity sweep across $\{0.1, 1.0, 10.0, 100.0\}$ → Figure 10 **[COMPLETED ✅]**
 5. **Section 7.3**: Membership Inference Attack (MIA) and DCR privacy audit **[COMPLETED ✅]**
 6. **Section 8**: Data Availability Statement placeholder **[RESOLVED ✅]**
 
@@ -939,6 +963,9 @@ python caveat_bench/make_figure9_TRC.py    # Generate Figure 9 diurnal curves
 # ── Gradient Diagnostics (Figure 8) ──────────────────────
 python diagnostics/gradient_analysis/run_advanced_gradient_analysis.py # 2x2 factorial check
 python diagnostics/gradient_analysis/make_figure8_TRC.py               # Render Figure 8 TRC plot
+
+# ── Sensitivity Sweep & Trade-Off (Figure 10) ────────────
+python experiments/sensitivity_sweep/make_figure10_TRC.py              # Render Figure 10 TRC plot
 
 # ── Dashboard ────────────────────────────────────────────
 streamlit run dashboard.py
