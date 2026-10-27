@@ -18,8 +18,11 @@ import sys
 import glob
 import csv
 import io
+import itertools
 import json
 from datetime import datetime, timezone
+
+from evaluation.postprocess import PRESETS, apply_preset
 
 # ---------------------------------------------------------------------------
 # Path setup — allow dynamically importing Generator based on version
@@ -1152,7 +1155,135 @@ def diaries_to_json_bytes(records: list) -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def page_generate(G, cfg, data):
+FILTER_OFF = "Off"
+FILTER_HELP = (
+    "Bounded morphological consolidation of Employment spells (manuscript section 6.4.5). "
+    "Re-attaches fragmented work spells, restores a midday break in over-long spells and "
+    "extends isolated 30-minute work flickers. Useful before feeding schedules to "
+    "MATSim or ActivitySim. Variant 1 matches 2-hour work survival most closely; "
+    "variant 2 gives the lowest Employment Wasserstein error."
+)
+
+
+def count_spells(seq: np.ndarray, code: int = 1) -> int:
+    """Number of contiguous spells of activity ``code`` in one 48-slot diary."""
+    return sum(1 for k, _ in itertools.groupby(seq) if k == code)
+
+
+@st.cache_data(max_entries=256, show_spinner=False)
+def render_diary_png(decoded: np.ndarray, kind: str, title: str) -> bytes:
+    """Render a diary plot to PNG bytes. Cached so toggling the post-processing
+    filter back and forth does not redraw figures that were already drawn."""
+    fig = plot_timeline_strip(decoded, title=title) if kind == "strip" else plot_step_diary(decoded, title=title)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def generate_diaries(G, cfg, data, *, num_samples, district_id, state_id, gumbel_temp, gumbel_hard):
+    """Sample ``num_samples`` diaries and return decoded codes, shape (n, 48), values 1..9.
+
+    NOTE: the conditioning vector is copied from a random real ITUS record. The
+    demographic selectors in the sidebar are recorded as metadata but do not
+    change the generator input; only state, district and the Gumbel settings do.
+    """
+    all_cond = data["cond_vector"]
+    n_real = all_cond.shape[0]
+    decoded = np.empty((num_samples, 48), dtype=np.int64)
+
+    progress = st.progress(0.0, text="Generating diaries")
+    for i in range(num_samples):
+        cond_vec = all_cond[np.random.randint(0, n_real)].copy()
+        with torch.no_grad():
+            z = torch.randn(1, cfg["noise_dim"])
+            cv = torch.from_numpy(cond_vec).float().unsqueeze(0)
+            di = torch.tensor([district_id]).long()
+            si = torch.tensor([state_id]).long()
+            fake = G(z, cv, di, si, temp=gumbel_temp, hard=gumbel_hard)  # (1, 9, 48, 1)
+            fake_np = fake.squeeze(-1).squeeze(0).numpy()  # (9, 48)
+        decoded[i] = np.argmax(fake_np, axis=0) + 1
+        progress.progress((i + 1) / num_samples, text=f"Generating diaries ({i + 1}/{num_samples})")
+    progress.empty()
+    return decoded
+
+
+def build_records(base_meta: dict, decoded: np.ndarray, filter_name: str) -> list:
+    """One flat export record per diary (metadata + 48 slot columns)."""
+    records = []
+    for i in range(len(decoded)):
+        rec = {"sample_id": i + 1, **base_meta, "employment_filter": filter_name}
+        rec.update({TIME_SLOTS[j]: int(decoded[i, j]) for j in range(48)})
+        records.append(rec)
+    return records
+
+
+@st.fragment
+def render_results():
+    """Show the last generated batch. Runs as a fragment, so changing the
+    post-processing filter or clicking a download button reruns only this block."""
+    gen = st.session_state["generated"]
+    raw = gen["decoded"]
+
+    st.caption(f"Showing the last generated batch: {len(raw)} diaries from {gen['meta']['model_version']}.")
+    with st.container(border=True):
+        choice = st.segmented_control(
+            "Employment post-processing",
+            [FILTER_OFF, *PRESETS],
+            default=FILTER_OFF,
+            required=True,
+            key="morph_choice",
+            help=FILTER_HELP,
+        )
+
+    shown = raw if choice == FILTER_OFF else apply_preset(raw, choice)
+    if choice != FILTER_OFF:
+        n_changed = int((shown != raw).any(axis=1).sum())
+        st.caption(f"{choice} modified {n_changed} of {len(raw)} diaries. Plots and exports below use the filtered schedules.")
+
+    for i in range(len(shown)):
+        if len(shown) > 1:
+            st.subheader(f"Sample {i + 1}")
+        decoded = shown[i]
+
+        if choice != FILTER_OFF:
+            st.caption(
+                f"Employment spells: {count_spells(raw[i])} raw -> {count_spells(decoded)} filtered"
+            )
+
+        st.image(render_diary_png(decoded, "strip", gen["title"]), width="stretch")
+        st.image(render_diary_png(decoded, "step", "Activity Step Plot"), width="stretch")
+
+        st.subheader("⏱️ Time Breakdown")
+        st.table(time_breakdown_table(decoded))
+        st.divider()
+
+    st.subheader("⬇️ Export Generated Diaries")
+    records = build_records(gen["meta"], shown, choice)
+    timestamp = gen["timestamp"]
+    suffix = "" if choice == FILTER_OFF else "_" + choice.lower().replace(" ", "")
+    col_csv, col_json = st.columns(2)
+    with col_csv:
+        st.download_button(
+            "Download CSV",
+            data=diaries_to_csv_bytes(records),
+            file_name=f"tusgan_diaries_{timestamp}{suffix}.csv",
+            mime="text/csv",
+            key="dl_csv",
+            width="stretch",
+        )
+    with col_json:
+        st.download_button(
+            "Download JSON",
+            data=diaries_to_json_bytes(records),
+            file_name=f"tusgan_diaries_{timestamp}{suffix}.json",
+            mime="application/json",
+            key="dl_json",
+            width="stretch",
+        )
+
+
+def page_generate(G, cfg, data, version_label: str = "TUS-GAN"):
     """Generate Diary page."""
     st.header("Generate Synthetic Daily Routine")
 
@@ -1176,36 +1307,30 @@ def page_generate(G, cfg, data):
         sid: STATE_NAMES.get(sid, f"State {sid}")
         for sid in range(num_states)
     }
-    state_sel_idx = st.sidebar.selectbox(
+    state_id = st.sidebar.selectbox(
         "State",
         range(num_states),
         index=min(1, num_states - 1),
         format_func=lambda sid: f"[{sid}] {state_options[sid]}",
     )
-    state_id = state_sel_idx
 
     # --- District selection (filtered by selected state) ---
     state_district_map = DISTRICT_NAMES_BY_STATE.get(state_id, {})
-    # Build list of district IDs that exist in data for this state
-    all_district_ids = list(range(num_districts))
     if state_district_map:
-        # Show only districts that belong to this state (from PDF mapping)
         available_district_ids = sorted(state_district_map.keys())
     else:
-        # Fallback: show all district IDs if no mapping exists
-        available_district_ids = all_district_ids
+        available_district_ids = list(range(num_districts))
 
     district_options = {
         did: state_district_map.get(did, f"District {did}")
         for did in available_district_ids
     }
-    district_sel_idx = st.sidebar.selectbox(
+    district_id = st.sidebar.selectbox(
         "District",
         available_district_ids,
         index=0,
         format_func=lambda did: f"[{did}] {district_options[did]}",
     )
-    district_id = district_sel_idx
 
     # --- Gumbel-Softmax Parameters (v3 Feature!) ---
     st.sidebar.header("Gumbel-Softmax Settings")
@@ -1214,7 +1339,7 @@ def page_generate(G, cfg, data):
 
     num_samples = st.sidebar.number_input("Number of diaries", min_value=1, max_value=100, value=10)
 
-    generate = st.sidebar.button("Generate Diary", type="primary", use_container_width=True)
+    generate = st.sidebar.button("Generate Diary", type="primary", width="stretch")
 
     # --- Info blurb ---
     st.info(
@@ -1224,97 +1349,41 @@ def page_generate(G, cfg, data):
         "into a crisp 24-hour routine."
     )
 
-    if not generate:
-        return
-
-    # --- Build conditioning vector ---
-    all_cond = data["cond_vector"]  # (N, cond_dim)
-    n_real = all_cond.shape[0]
-
-    all_records = []
-
-    for sample_idx in range(num_samples):
-        # Pick a random real sample as template
-        rand_idx = np.random.randint(0, n_real)
-        cond_vec = all_cond[rand_idx].copy()  # (cond_dim,)
-
-        # Inference
-        with torch.no_grad():
-            z = torch.randn(1, cfg["noise_dim"])
-            cv = torch.from_numpy(cond_vec).float().unsqueeze(0)
-            di = torch.tensor([district_id]).long()
-            si = torch.tensor([state_id]).long()
-
-            # Pass temp and hard options dynamically to v3 Generator
-            fake = G(z, cv, di, si, temp=gumbel_temp, hard=gumbel_hard)  # (1, 9, 48, 1)
-            fake_np = fake.squeeze(-1).squeeze(0).numpy()  # (9, 48)
-
-        # Decode: argmax across 9 channels → activity code 1-9
-        decoded = np.argmax(fake_np, axis=0) + 1  # (48,)
-
-        # --- Display ---
-        if num_samples > 1:
-            st.subheader(f"Sample {sample_idx + 1}")
-
-        # 1) Colour-coded timeline strip
-        title_strip = f"Timeline — {gender_sel}, {age_sel}"
-        fig_strip = plot_timeline_strip(decoded, title=title_strip)
-        st.pyplot(fig_strip)
-        plt.close(fig_strip)
-
-        # 2) Step plot
-        fig_step = plot_step_diary(decoded, title="Activity Step Plot")
-        st.pyplot(fig_step)
-        plt.close(fig_step)
-
-        # 3) Time breakdown table
-        st.subheader("⏱️ Time Breakdown")
-        breakdown = time_breakdown_table(decoded)
-        st.table(breakdown)
-
-        st.divider()
-
-        # Record this diary for CSV/JSON export
-        record = {
-            "sample_id": sample_idx + 1,
-            "age_group": age_sel,
-            "gender": gender_sel,
-            "marital_status": marital_sel,
-            "education": edu_sel,
-            "principal_activity": act_sel,
-            "day_of_week": dow_sel,
-            "sector": sector_sel,
-            "caregiving_required": caregiving_sel,
-            "state_id": state_id,
-            "state_name": state_options[state_id],
-            "district_id": district_id,
-            "district_name": district_options[district_id],
-            "gumbel_temperature": gumbel_temp,
-            "gumbel_hard": gumbel_hard,
+    if generate:
+        decoded = generate_diaries(
+            G, cfg, data,
+            num_samples=int(num_samples),
+            district_id=district_id,
+            state_id=state_id,
+            gumbel_temp=gumbel_temp,
+            gumbel_hard=gumbel_hard,
+        )
+        # Persist the batch so later reruns (filter toggle, downloads) keep it.
+        st.session_state["generated"] = {
+            "decoded": decoded,
+            "title": f"Timeline — {gender_sel}, {age_sel}",
+            "timestamp": datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+            "meta": {
+                "model_version": version_label,
+                "age_group": age_sel,
+                "gender": gender_sel,
+                "marital_status": marital_sel,
+                "education": edu_sel,
+                "principal_activity": act_sel,
+                "day_of_week": dow_sel,
+                "sector": sector_sel,
+                "caregiving_required": caregiving_sel,
+                "state_id": state_id,
+                "state_name": state_options[state_id],
+                "district_id": district_id,
+                "district_name": district_options[district_id],
+                "gumbel_temperature": gumbel_temp,
+                "gumbel_hard": gumbel_hard,
+            },
         }
-        record.update({TIME_SLOTS[i]: int(decoded[i]) for i in range(48)})
-        all_records.append(record)
 
-    # --- Export generated diaries ---
-    st.subheader("⬇️ Export Generated Diaries")
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    col_csv, col_json = st.columns(2)
-    with col_csv:
-        st.download_button(
-            "Download CSV",
-            data=diaries_to_csv_bytes(all_records),
-            file_name=f"tusgan_diaries_{timestamp}.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with col_json:
-        st.download_button(
-            "Download JSON",
-            data=diaries_to_json_bytes(all_records),
-            file_name=f"tusgan_diaries_{timestamp}.json",
-            mime="application/json",
-            use_container_width=True,
-        )
+    if "generated" in st.session_state:
+        render_results()
 
 
 def page_evaluation(eval_dir: str, version_label: str):
@@ -1339,7 +1408,7 @@ def page_evaluation(eval_dir: str, version_label: str):
         name = os.path.splitext(os.path.basename(img_path))[0]
         nice_name = name.replace("_", " ").title()
         st.subheader(nice_name)
-        st.image(img_path, use_container_width=True)
+        st.image(img_path, width="stretch")
 
 
 # ---------------------------------------------------------------------------
@@ -1404,7 +1473,7 @@ def main():
     G, cfg, data = load_model_and_data(version_key, ckpt_path, data_path)
 
     if page == "Generate Diary":
-        page_generate(G, cfg, data)
+        page_generate(G, cfg, data, version_label)
     else:
         page_evaluation(eval_dir, version_label)
 
