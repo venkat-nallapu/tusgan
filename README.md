@@ -74,7 +74,7 @@ Activity-based travel demand modeling (ABM), urban infrastructure simulation (e.
 
 - **🏆 Unprecedented Macro Fidelity**: Achieves a population-level **Macro JSD of $0.000083 \pm 0.000007$** across all 9 ICATUS divisions, meeting the strict pre-registered target of $< 1.0 \times 10^{-4}$ and outperforming existing GAN and VAE baselines by an order of magnitude.
 - **🔬 Mathematical Derivation of the Dead-Gradient Theorem**: Proves both theoretically and empirically that hard logit masking (clamping logits to $-10^9$) identically severs gradient flow through Channel 0 output projection weights ($\nabla_{W_0} \mathcal{L} \equiv \mathbf{0}$) due to softmax Jacobian collapse, warping upstream representations and degrading fidelity nearly 19-fold. Demonstrates that soft neuro-symbolic penalties restore active learning ($\mathcal{G}_0 > 0$) across both CNN and Transformer backbones.
-- **📊 Two-Way ANOVA Deconfounding Proof**: Through a rigorous $2 \times 2$ factorial matrix (Backbone $\times$ Constraint Mechanism, $N = 12$ independent seeds), proves via Two-Way ANOVA that the **constraint enforcement mechanism drives 89.4% of JSD variance ($p < 0.001$) and 96.8% of output gradient variance**, decisively refuting the hypothesis that model architecture was the root cause of performance degradation.
+- **📊 Two-Way Factorial & Crossover Interaction Proof**: Through a complete $2 \times 2$ factorial matrix (Backbone $\times$ Constraint Mechanism), demonstrates that hard logit masking severs Channel-0 gradients across both backbones ($\nabla_{W_0}\mathcal{L} \equiv \mathbf{0}$) and causes a $28.8\times$ JSD degradation in the convolutional backbone (Cell C vs. Cell A), while revealing a significant Backbone $\times$ Constraint crossover interaction ($67.28\%$ of JSD variance, $p < 0.0001$) and proving that soft penalties improve contiguous spell-duration fidelity by $26\%\text{–}36\%$ across both architectures.
 - **🌐 Third-Party Benchmarking (Caveat / ActEval)**: Evaluated directly inside Shone & Hillel's (*Transportation Research Part C*, 2025) official benchmark suite against ActVAE (250-epoch parity retraining on dual Tesla T4 GPUs). TUS-GAN demonstrates **$27.4\times$ superior participation fidelity**, **$19.4\times$ superior timing accuracy**, **$13.0\times$ superior transitions**, and **$32.1\times$ closer sequence length EMD**, while exposing ActVAE's $99.2\%$ mode collapse (`homogeneity = 0.9922`) and total caregiving erasure.
 - **⏱️ Sub-15-Minute Spell Pacing Realism**: Continuously parses schedules via Run-Length Encoding (RLE) to evaluate 1-Wasserstein Earth Mover's Distance ($W_1$). Across all 9 ICATUS divisions, TUS-GAN bounds average pacing error to **$14.3$ minutes** ($W_1 = 0.478$ slots), matching routine chore durations ($4.1$ min error) and nocturnal sleep anchor blocks ($4.3$ min error).
 - **🛡️ Empirical Privacy & Disclosure Verification**: Exhaustive empirical audit confirms zero training data memorization ($\text{Exact Match Rate} = 0.1000\%$, matching baseline random test match rate of $0.0600\%$), high generalization parity ($\text{Macro DCR Parity} = 0.9293$), and complete resistance to multi-signal shadow-model Membership Inference Attacks ($\text{AUC} = 0.5013 \pm 0.0112$, attacker advantage $\text{Adv} = 0.0026$).
@@ -316,7 +316,7 @@ Table 6 evaluates the $2 \times 2$ factorial matrix across 3 independent random 
 | Inference Compliance Protocol | Rejection Sampling | Structural Clamp | Structural Clamp | Rejection Sampling |
 | **GRADIENT DIAGNOSTICS (CHANNEL 0)** | | | | |
 | Output Weight Gradient Norm ($\mathcal{G}_0$) | **$1.16 \times 10^{-1}$ (Active)** | **0.000000 (DEAD)** | **0.000000 (DEAD)** | **2.911238 (Active)** |
-| Upstream Embedding Drift Ratio ($\rho_l$) | $0.98 \pm 0.04$ | $4.82 \pm 0.35$ | $5.51 \pm 0.42$ | $1.04 \pm 0.06$ |
+| Upstream Dense FC Drift Ratio ($\rho_l$) | $0.94 \pm 0.04$ | $0.63 \pm 0.05$ | $1.31 \pm 0.08$ | $0.33 \pm 0.04$ |
 | **POPULATION FIDELITY** | | | | |
 | Macro Jensen-Shannon Divergence (JSD) | **$\mathbf{0.000083 \pm 0.000007}$** | $0.001557 \pm 0.000112$ | $0.002387 \pm 0.000184$ | $0.004534 \pm 0.000315$ |
 | 4-Quadrant Time-Sliced Transition ($F$) | **$\mathbf{0.1630 \pm 0.0038}$** | $0.2740 \pm 0.0084$ | $0.4894 \pm 0.0142$ | $0.2476 \pm 0.0092$ |
@@ -324,15 +324,16 @@ Table 6 evaluates the $2 \times 2$ factorial matrix across 3 independent random 
 | **NORMATIVE COMPLIANCE & OVERHEAD** | | | | |
 | Raw Child Labor Violations ($v_{\text{raw}}$) | **$0.30\% \pm 0.01\%$** | $0.00\%$ *(dead grad)* | $0.00\%$ *(dead grad)* | $0.01\% \pm 0.00\%$ |
 | Delivered Violations ($v_{\text{del}}$) | **$\mathbf{0.00\%}$** | $\mathbf{0.00\%}$ | $\mathbf{0.00\%}$ | $\mathbf{0.00\%}$ |
-| Rejection Discard Rate ($\delta$) | **$0.30\% \pm 0.01\%$** | $0.00\%$ | $0.00\%$ | $0.01\% \pm 0.00\%$ |
+| Child-Cohort Discard Rate ($d_{\text{child}}$) | **$0.30\% \pm 0.01\%$** | $0.00\%$ | $0.00\%$ | $0.01\% \pm 0.00\%$ |
+| Population-Wide Discard Rate ($d_{\text{pop}}$) | **$0.04\% \pm 0.01\%$** | $0.00\%$ | $0.00\%$ | $<0.01\%$ |
 
 #### Two-Way ANOVA Variance Decomposition
-A two-way Analysis of Variance (ANOVA) on Macro JSD reveals:
-- **Constraint Enforcement Effect**: $F(1, 8) = 184.2, \; p < 0.0001, \; \eta_p^2 = 0.894$ (**89.4% of total variance explained by constraint mechanism**).
-- **Backbone Architecture Effect**: $F(1, 8) = 12.6, \; p = 0.0075, \; \eta_p^2 = 0.082$ (8.2% of variance).
-- **Interaction Effect**: $F(1, 8) = 3.1, \; p = 0.1160, \; \eta_p^2 = 0.024$ (not significant).
+A two-way Analysis of Variance (ANOVA) across the $2 \times 2$ design reveals:
+- **Backbone $\times$ Constraint Crossover Interaction**: $67.28\%$ of Macro JSD variance ($p < 0.0001$). In the convolutional backbone, soft penalization outperforms hard masking by $28.8\times$ on Macro JSD ($0.000083$ vs. $0.002387$), whereas in the unlocalized Transformer backbone, soft penalization exhibits higher aggregate diurnal variance ($0.004534$ vs. $0.001557$) while reducing contiguous spell-duration $W_1$ error by $25.6\%$ ($18.45\text{ min}$ vs. $24.80\text{ min}$) and transition Frobenius error ($0.2476$ vs. $0.2740$).
+- **Backbone Architecture Main Effect**: $31.61\%$ of Macro JSD variance ($p < 0.0001$).
+- **Channel-0 Output Gradient Variance**: $96.8\%$ driven by the constraint enforcement mechanism ($p < 0.0001$), with hard masking identically extinguishing $\nabla_{W_0}\mathcal{L} \equiv \mathbf{0}$ across both backbones.
 
-**Definitive Scientific Verdict**: The $2 \times 2$ factorial matrix decisively refutes the hypothesis that architectural choice caused the fidelity collapse. Hard logit masking induces catastrophic gradient starvation regardless of whether a CNN or Transformer is used, while soft neuro-symbolic penalties preserve gradient flow and deliver superior population fidelity across both backbones.
+**Definitive Scientific Verdict**: The $2 \times 2$ factorial matrix proves that hard logit masking unconditionally severs Channel-0 output gradients across both CNN and Transformer backbones, whereas soft neuro-symbolic penalization restores active Channel-0 learning and consistently improves contiguous spell-duration realism, achieving its optimal Pareto equilibrium when paired with localized convolutional inductive bias (Cell A).
 
 ---
 

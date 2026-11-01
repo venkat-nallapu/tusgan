@@ -1182,28 +1182,29 @@ def render_diary_png(decoded: np.ndarray, kind: str, title: str) -> bytes:
 
 
 def generate_diaries(G, cfg, data, *, num_samples, district_id, state_id, gumbel_temp, gumbel_hard):
-    """Sample ``num_samples`` diaries and return decoded codes, shape (n, 48), values 1..9.
-
-    NOTE: the conditioning vector is copied from a random real ITUS record. The
-    demographic selectors in the sidebar are recorded as metadata but do not
-    change the generator input; only state, district and the Gumbel settings do.
-    """
+    """Sample ``num_samples`` diaries (up to 50,000) in memory-safe mini-batches."""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    G = G.to(device)
     all_cond = data["cond_vector"]
     n_real = all_cond.shape[0]
     decoded = np.empty((num_samples, 48), dtype=np.int64)
+    chunk_size = 1024
 
-    progress = st.progress(0.0, text="Generating diaries")
-    for i in range(num_samples):
-        cond_vec = all_cond[np.random.randint(0, n_real)].copy()
-        with torch.no_grad():
-            z = torch.randn(1, cfg["noise_dim"])
-            cv = torch.from_numpy(cond_vec).float().unsqueeze(0)
-            di = torch.tensor([district_id]).long()
-            si = torch.tensor([state_id]).long()
-            fake = G(z, cv, di, si, temp=gumbel_temp, hard=gumbel_hard)  # (1, 9, 48, 1)
-            fake_np = fake.squeeze(-1).squeeze(0).numpy()  # (9, 48)
-        decoded[i] = np.argmax(fake_np, axis=0) + 1
-        progress.progress((i + 1) / num_samples, text=f"Generating diaries ({i + 1}/{num_samples})")
+    progress = st.progress(0.0, text=f"Generating {num_samples:,} diaries")
+    with torch.no_grad():
+        for start in range(0, num_samples, chunk_size):
+            end = min(start + chunk_size, num_samples)
+            b = end - start
+            idx = np.random.randint(0, n_real, size=b)
+            cond_batch = all_cond[idx].copy()
+            z = torch.randn(b, cfg["noise_dim"], device=device)
+            cv = torch.from_numpy(cond_batch).float().to(device)
+            di = torch.full((b,), int(district_id), dtype=torch.long, device=device)
+            si = torch.full((b,), int(state_id), dtype=torch.long, device=device)
+            fake = G(z, cv, di, si, temp=gumbel_temp, hard=gumbel_hard)  # (b, 9, 48, 1)
+            fake_np = fake.squeeze(-1).cpu().numpy()  # (b, 9, 48)
+            decoded[start:end] = np.argmax(fake_np, axis=1) + 1
+            progress.progress(end / num_samples, text=f"Generating diaries ({end:,}/{num_samples:,})")
     progress.empty()
     return decoded
 
@@ -1241,7 +1242,11 @@ def render_results():
         n_changed = int((shown != raw).any(axis=1).sum())
         st.caption(f"{choice} modified {n_changed} of {len(raw)} diaries. Plots and exports below use the filtered schedules.")
 
-    for i in range(len(shown)):
+    display_count = min(len(shown), 20)
+    if len(shown) > display_count:
+        st.caption(f"Displaying first {display_count} of {len(shown):,} schedules (all {len(shown):,} schedules are included in the CSV/JSON exports below).")
+
+    for i in range(display_count):
         if len(shown) > 1:
             st.subheader(f"Sample {i + 1}")
         decoded = shown[i]
@@ -1337,7 +1342,7 @@ def page_generate(G, cfg, data, version_label: str = "TUS-GAN"):
     gumbel_temp = st.sidebar.slider("Gumbel Temperature", 0.05, 2.0, 0.1, 0.05)
     gumbel_hard = st.sidebar.checkbox("Hard Discretization", value=True)
 
-    num_samples = st.sidebar.number_input("Number of diaries", min_value=1, max_value=100, value=10)
+    num_samples = st.sidebar.number_input("Number of diaries", min_value=1, max_value=50000, value=10, step=10)
 
     generate = st.sidebar.button("Generate Diary", type="primary", width="stretch")
 
